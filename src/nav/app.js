@@ -173,6 +173,11 @@ function fitRoute(pad=60){ if(!R.ll.length) return; let a=1e9,b=-1e9,c=1e9,d=-1e
 function panBy(dx,dy){ const z=Math.round(MAP.zf), sc=2**(MAP.zf-z), c=Math.cos(-MAP.rot), s=Math.sin(-MAP.rot), ux=(dx*c-dy*s)/sc, uy=(dx*s+dy*c)/sc;
   MAP.lon=x2lon(lon2x(MAP.lon,z)-ux,z); MAP.lat=y2lat(lat2y(MAP.lat,z)-uy,z); draw(); }
 addEventListener('resize',resize);
+$('map').addEventListener('keydown',e=>{ const k=e.key, step=80;
+  if(k==='+'||k==='='){ MAP.zf=clamp(MAP.zf+0.5,3,19.5); draw(); }
+  else if(k==='-'||k==='_'){ MAP.zf=clamp(MAP.zf-0.5,3,19.5); draw(); }
+  else if(k.startsWith('Arrow')){ if(MAP.follow&&NAV.on) setFollow(false); panBy(k==='ArrowLeft'?step:k==='ArrowRight'?-step:0,k==='ArrowUp'?step:k==='ArrowDown'?-step:0); }
+  else return; e.preventDefault(); });
 
 /* ---------------- voice ---------------- */
 const VOICE={on:store.get('rnVoice',true),miles:store.get('rnMiles',true),unlocked:false};
@@ -249,14 +254,14 @@ let wake=null;
 async function keepAwake(){ try{ if('wakeLock' in navigator&&document.visibilityState==='visible'){ wake=await navigator.wakeLock.request('screen'); } }catch(e){} }
 document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible'&&NAV.on) keepAwake(); });
 function startGps(){ if(NAV.watch!=null||NAV.demo) return; if(!('geolocation' in navigator)){ toast('This browser has no GPS access.'); return; }
-  NAV.watch=navigator.geolocation.watchPosition(p=>onFix({lat:p.coords.latitude,lon:p.coords.longitude,acc:p.coords.accuracy||30,heading:p.coords.heading,speed:p.coords.speed,t:p.timestamp}),
+  NAV.watch=navigator.geolocation.watchPosition(p=>{ const f={lat:p.coords.latitude,lon:p.coords.longitude,acc:p.coords.accuracy||30,heading:p.coords.heading,speed:p.coords.speed,t:p.timestamp}; if(NAV.demo){ NAV.realFix=f; return; } onFix(f); },
     e=>{ $('gpsWarn').hidden=false; $('gpsWarn').textContent=e.code===1?'Location is blocked. Allow it for this site in your browser settings.':'Looking for GPS…'; },
     {enableHighAccuracy:true,maximumAge:1000,timeout:30000}); }
 function updateAway(){ if(!NAV.fix||!R.ll.length) return; const [x,y]=toXY(NAV.fix.lat,NAV.fix.lon), d=Math.hypot(x-R.xy[0][0],y-R.xy[0][1]); const [v,u]=fmtDist(d); $('rAway').textContent=v+' '+u; }
 
 /* ---------------- start / stop ---------------- */
 function begin(demo=false){
-  NAV.on=true; NAV.demo=demo; NAV.s=null; NAV.said.clear(); NAV.mile=0; NAV.done=false; NAV.offOn=false; NAV.off=0; NAV.t0=Date.now();
+  NAV.on=true; NAV.demo=demo; if(demo){ NAV.fix=null; NAV.head=null; NAV.lastXY=null; } NAV.s=null; NAV.said.clear(); NAV.mile=0; NAV.done=false; NAV.offOn=false; NAV.off=0; NAV.t0=Date.now();
   $('startSheet').hidden=true; $('bar').hidden=false; $('fabs').hidden=false;
   // a gesture is needed before speech works on iPhones
   if('speechSynthesis' in window){ try{ const u=new SpeechSynthesisUtterance(' '); u.volume=0; speechSynthesis.speak(u); }catch(e){} }
@@ -265,7 +270,7 @@ function begin(demo=false){
   if(demo) runDemo(); else { startGps(); if(NAV.fix) onFix(NAV.fix); else update(); }
   store.set('rnActive',{key:currentKey(),t0:NAV.t0});
 }
-function end(){ NAV.on=false; if(NAV.demo){ NAV.demo=false; clearInterval(DEMO.t); } NAV.s=null; NAV.next=null; try{ wake&&wake.release(); }catch(e){} wake=null;
+function end(){ NAV.on=false; if(NAV.demo){ NAV.demo=false; clearInterval(DEMO.t); if(NAV.realFix){ NAV.fix=NAV.realFix; NAV.head=null; NAV.lastXY=null; } } NAV.s=null; NAV.next=null; try{ wake&&wake.release(); }catch(e){} wake=null;
   $('bar').hidden=$('fabs').hidden=$('banner').hidden=$('then').hidden=true; $('pocket').hidden=true; $('startSheet').hidden=false; store.set('rnActive',null); fitRoute(); }
 // simulated run: walks the route at ~9 min/mile pace, sped up, with a little GPS wobble
 const DEMO={t:null,s:0};
@@ -275,12 +280,13 @@ function runDemo(){ DEMO.s=0; clearInterval(DEMO.t); const speed=2.98*12; // met
     if(DEMO.s>R.total+30){ clearInterval(DEMO.t); } },500); }
 
 /* ---------------- pocket mode ---------------- */
-function pocket(on){ $('pocket').hidden=!on; if(on){ keepAwake(); pocketUpdate(); toast('Pocket mode: voice cues on, screen locked. Hold the circle to unlock.'); } }
+function pocket(on){ $('pocket').hidden=!on; if(!on) $('pocketBtn').focus(); if(on){ $('hold').focus(); keepAwake(); pocketUpdate(); toast('Pocket mode: voice cues on, screen locked. Hold the circle to unlock.'); } }
 function pocketUpdate(){ if($('pocket').hidden) return; const nc=NAV.next; if(!nc) return; $('pIc').innerHTML=arrowSvg(NAV.offOn?'OFF':nc.k); const [d,u]=NAV.offOn?['Off','route']:fmtDist(Math.max(0,nc.s-(NAV.s??0)));
   $('pDist').textContent=`${d} ${u}`; $('pTxt').textContent=NAV.offOn?'Head back to the route':cueText(nc); $('pStat').textContent=`${$('sDone').textContent} / ${(R.total/MI).toFixed(2)} mi · ${$('sTime').textContent}`; }
 (()=>{ const h=$('hold'); let t=null; const stop=()=>{ h.classList.remove('on'); clearTimeout(t); };
   h.addEventListener('pointerdown',e=>{ e.preventDefault(); h.classList.add('on'); t=setTimeout(()=>{ stop(); pocket(false); },1200); });
   h.addEventListener('pointerup',stop); h.addEventListener('pointerleave',stop); h.addEventListener('pointercancel',stop);
+  h.addEventListener('keydown',e=>{ if((e.key==='Enter'||e.key===' ')&&!e.repeat){ e.preventDefault(); h.classList.add('on'); t=setTimeout(()=>{ stop(); pocket(false); },1200); } }); h.addEventListener('keyup',stop); h.addEventListener('click',e=>e.preventDefault());
   $('pocket').addEventListener('contextmenu',e=>e.preventDefault()); })();
 
 /* ---------------- sharing ---------------- */
@@ -305,7 +311,7 @@ function remember(){ const list=store.get('rnRecent',[]).filter(r=>r.name+'|'+r.
 function load(src,{save=true}={}){
   R.src=src; prepare(src); if(save) remember();
   $('landSheet').hidden=true; $('startSheet').hidden=false;
-  $('rName').textContent=R.name; $('rDist').textContent=(R.total/MI).toFixed(2)+' mi'; $('rTurns').textContent=String(R.cues.filter(c=>c.k!=='START'&&c.k!=='END'&&c.k!=='S').length);
+  $('cuesBtn2').textContent=`See all ${R.cues.filter(c=>c.k!=='START'&&c.k!=='END').length} turns`; $('rName').textContent=R.name; $('rDist').textContent=(R.total/MI).toFixed(2)+' mi'; $('rTurns').textContent=String(R.cues.filter(c=>c.k!=='START'&&c.k!=='END'&&c.k!=='S').length);
   const c0=R.cues[0]; $('rStart').textContent=`Starts ${c0.where?'at '+c0.where:'at the S on the map'}${R.loop?' and loops back there':''}. ${cueText(c0)}.`;
   const [la,lo]=R.ll[0]; $('dirBtn').href=`https://www.google.com/maps/dir/?api=1&destination=${la.toFixed(6)},${lo.toFixed(6)}&travelmode=walking`;
   document.title=R.name+' · Run Nav'; MAP.follow=false; fitRoute(); drawPreview(); startGps(); }
@@ -318,7 +324,31 @@ function drawPreview(){ const cv=$('preview'), r=cv.getBoundingClientRect(), d=d
 function showLanding(){ $('startSheet').hidden=true; $('landSheet').hidden=false; const list=store.get('rnRecent',[]); $('recentWrap').hidden=!list.length; const box=$('recent'); box.innerHTML='';
   for(const r of list){ const b=document.createElement('button'); b.innerHTML='<span></span><small></small>'; b.firstChild.textContent=r.name; b.lastChild.textContent=(r.len/MI).toFixed(1)+' mi';
     b.onclick=()=>load({...r.src,pts:decPoly(r.src.pts)},{save:true}); box.appendChild(b); } }
+$('gpxBtn').onclick=()=>$('gpxFile').click();
 $('gpxFile').addEventListener('change',async e=>{ const f=e.target.files[0]; e.target.value=''; if(!f) return; try{ load(parseGpx(await f.text(),f.name)); history.replaceState(null,'',location.pathname); }catch(err){ toast(err.message||'Could not read that file.'); } });
+
+
+/* ---------------- full cue sheet ---------------- */
+let cueOpener=null;
+function openCues(from){
+  cueOpener=from||document.activeElement; const list=$('cueList'); list.innerHTML='';
+  const s=NAV.on&&NAV.s!=null?NAV.s:-1, nextIdx=NAV.on&&NAV.next?R.cues.indexOf(NAV.next):-1;
+  const turns=R.cues.filter(c=>c.k!=='START'&&c.k!=='END').length;
+  $('cueInfo').textContent=`${(R.total/MI).toFixed(2)} mi · ${turns} turn${turns===1?'':'s'}${s>=0?` · ${((R.total-s)/MI).toFixed(2)} mi to go`:''}. Tap a turn to see it on the map.`;
+  R.cues.forEach((c,i)=>{ const li=document.createElement('li'); if(s>=0&&c.s<s-6&&i!==nextIdx) li.className='past'; if(i===nextIdx) li.className='next';
+    const nxt=R.cues[i+1], leg=nxt?nxt.s-c.s:0;
+    li.innerHTML=`<button type="button"><span class="at"></span><span class="ic" aria-hidden="true">${arrowSvg(c.k)}</span><span class="tx"><b></b><small></small></span><span class="ln"></span></button>`;
+    li.querySelector('.at').textContent=(c.s/MI).toFixed(2); li.querySelector('b').textContent=cueText(c);
+    li.querySelector('small').textContent=c.where?(c.k==='END'?c.where:'at '+c.where):'';
+    li.querySelector('.ln').textContent=leg>0?fmtDist(leg).join(' '):'';
+    li.querySelector('button').setAttribute('aria-label',`Mile ${(c.s/MI).toFixed(2)}: ${cueText(c)}${c.where?', at '+c.where:''}`);
+    li.querySelector('button').onclick=()=>{ closeCues(); setFollow(false); const [la,lo]=R.ll[c.i]; MAP.lat=la; MAP.lon=lo; MAP.zf=Math.max(MAP.zf,17.5); MAP.rot=0; draw();
+      toast(`${cueText(c)}${c.where?' · '+c.where:''}. Tap the target button to follow you again.`,4500); };
+    list.appendChild(li); });
+  $('cueSheet').hidden=$('scrim').hidden=false;
+  const cur=list.querySelector('li.next')||list.firstChild; cur&&cur.scrollIntoView({block:'center'}); (cur&&cur.querySelector('button')||$('cueClose')).focus({preventScroll:true}); }
+function closeCues(){ if($('cueSheet').hidden) return; $('cueSheet').hidden=true; if($('menuSheet').hidden) $('scrim').hidden=true; if(cueOpener&&cueOpener.focus) cueOpener.focus(); }
+$('cuesBtn').onclick=e=>openCues(e.currentTarget); $('cuesBtn2').onclick=e=>openCues(e.currentTarget); $('cueClose').onclick=closeCues;
 
 /* ---------------- wiring ---------------- */
 $('goBtn').onclick=()=>begin(false);
@@ -332,12 +362,13 @@ $('fHead').onclick=()=>setHead(!MAP.headUp); $('mHead').onchange=e=>setHead(e.ta
 const setVoice=on=>{ VOICE.on=on; store.set('rnVoice',on); $('fVoice').setAttribute('aria-pressed',String(on)); $('mVoice').checked=on; if(!on) try{ speechSynthesis.cancel(); }catch(e){} };
 $('fVoice').onclick=()=>{ setVoice(!VOICE.on); toast(VOICE.on?'Voice cues on.':'Voice cues off.'); }; $('mVoice').onchange=e=>setVoice(e.target.checked);
 $('mMiles').onchange=e=>{ VOICE.miles=e.target.checked; store.set('rnMiles',VOICE.miles); }; $('mMiles').checked=VOICE.miles;
-const closeMenu=()=>{ $('menuSheet').hidden=$('scrim').hidden=true; };
-$('menuBtn').onclick=()=>{ $('menuSheet').hidden=$('scrim').hidden=false; }; $('mClose').onclick=closeMenu; $('scrim').onclick=closeMenu;
-$('mEnd').onclick=()=>{ closeMenu(); end(); };
-$('mRestart').onclick=()=>{ closeMenu(); const d=NAV.demo; end(); begin(d); };
+const closeMenu=()=>{ $('menuSheet').hidden=$('scrim').hidden=true; $('menuBtn').focus(); };
+$('menuBtn').onclick=()=>{ $('menuSheet').hidden=$('scrim').hidden=false; $('mVoice').focus(); }; $('mClose').onclick=closeMenu; $('scrim').onclick=()=>{ closeMenu(); closeCues(); };
+$('mEnd').onclick=()=>{ if(NAV.s>50&&!NAV.done&&!confirm('End this run? Your progress will be cleared.')) return; closeMenu(); end(); };
+$('mRestart').onclick=()=>{ if(NAV.s>50&&!NAV.done&&!confirm('Restart from the beginning? Your progress will be cleared.')) return; closeMenu(); const d=NAV.demo; end(); begin(d); };
 $('mShare').onclick=()=>{ closeMenu(); openShare(); };
 setVoice(VOICE.on); setHead(store.get('rnHead',false));
+document.addEventListener('keydown',e=>{ if(e.key!=='Escape') return; if(!$('cueSheet').hidden) closeCues(); else if(!$('menuSheet').hidden) closeMenu(); });
 
 (async()=>{ resize();
   try{ const r=await routeFromHash(location.hash); if(r){ load(r); return; } }catch(e){ toast('That route link looks damaged. Ask for a fresh link or open the GPX file.',6000); }

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#000000">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -23,6 +23,11 @@
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;height:100%;background:var(--black);color:var(--ink);font:15px/1.45 var(--body);overflow:hidden;overscroll-behavior:none}
 button{font:inherit;color:inherit;cursor:pointer}
+button,a,label,input{touch-action:manipulation}
+:focus-visible{outline:2px solid var(--teal2);outline-offset:2px}
+.btn:hover,.round:hover,#fabs button:hover,.list button:hover,.cues button:hover{border-color:var(--silver)}
+.btn.primary:hover{background:var(--teal2)}
+@media (prefers-reduced-motion:reduce){ *{transition:none!important;animation:none!important} }
 [hidden]{display:none!important}
 
 /* map */
@@ -59,8 +64,8 @@ button{font:inherit;color:inherit;cursor:pointer}
 #gpsWarn{position:fixed;left:10px;bottom:calc(var(--sab) + 84px);z-index:5;background:rgba(0,0,0,.9);border:1px solid var(--graphite);padding:6px 10px;font-size:12.5px;color:var(--amber);max-width:60vw}
 
 /* sheets (start, menu) */
-.sheet{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--carbon);border-top:2px solid transparent;border-image:linear-gradient(90deg,var(--teal),var(--teal2) 40%,transparent) 1;padding:18px 18px calc(var(--sab) + 18px);max-height:88vh;overflow:auto;display:grid;gap:14px}
-.sheet h1{font:900 22px/1.05 var(--display);text-transform:uppercase;letter-spacing:.01em;margin:0}
+.sheet{overscroll-behavior:contain;position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--carbon);border-top:2px solid transparent;border-image:linear-gradient(90deg,var(--teal),var(--teal2) 40%,transparent) 1;padding:18px 18px calc(var(--sab) + 18px);max-height:88vh;overflow:auto;display:grid;gap:14px}
+.sheet h1{text-wrap:balance;font:900 22px/1.05 var(--display);text-transform:uppercase;letter-spacing:.01em;margin:0}
 .eyebrow{font:600 10.5px var(--body);letter-spacing:.16em;text-transform:uppercase;color:var(--silver);display:flex;align-items:center;gap:8px}
 .eyebrow::before{content:"";width:6px;height:6px;background:var(--teal);transform:rotate(45deg)}
 .facts{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
@@ -78,9 +83,9 @@ button{font:inherit;color:inherit;cursor:pointer}
 .list small{color:var(--muted)}
 .toggle{display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:14px}
 .toggle input{appearance:none;width:44px;height:24px;background:var(--gun);position:relative;flex:none}
-.toggle input::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;background:var(--silver);transition:left .15s}
+.toggle input::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;background:var(--silver);transition:transform .15s}
 .toggle input:checked{background:var(--teal)}
-.toggle input:checked::after{left:23px;background:#000}
+.toggle input:checked::after{transform:translateX(20px);background:#000}
 #preview{width:100%;height:150px;background:#0b0c0e;border:1px solid var(--graphite)}
 .scrim{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:19}
 
@@ -90,11 +95,25 @@ button{font:inherit;color:inherit;cursor:pointer}
 #pocket .pd{font:700 56px/1 var(--mono);color:#4a4d52}
 #pocket .pt{font:600 20px/1.3 var(--body);color:#4a4d52;max-width:22ch}
 #pocket .ps{font:600 15px var(--mono);color:#34373b}
-#hold{margin-top:30px;width:120px;height:120px;border-radius:50%;border:2px solid #222;display:grid;place-items:center;color:#3a3d42;font:600 11px var(--body);letter-spacing:.14em;text-transform:uppercase;position:relative}
+#hold{background:transparent;margin-top:30px;width:120px;height:120px;border-radius:50%;border:2px solid #222;display:grid;place-items:center;color:#3a3d42;font:600 11px var(--body);letter-spacing:.14em;text-transform:uppercase;position:relative}
 #hold svg{position:absolute;inset:-2px;width:124px;height:124px;transform:rotate(-90deg)}
 #hold circle{fill:none;stroke:#00A19C;stroke-width:3;stroke-dasharray:377;stroke-dashoffset:377}
 #hold.on circle{transition:stroke-dashoffset 1.2s linear;stroke-dashoffset:0}
 
+
+/* full cue sheet */
+.cues{display:grid;gap:2px;margin:0;padding:0;list-style:none}
+.cues button{width:100%;display:grid;grid-template-columns:52px 26px minmax(0,1fr) auto;gap:10px;align-items:center;text-align:left;background:#17191c;border:1px solid transparent;padding:9px 10px;border-radius:2px}
+.cues .at{font:600 13px var(--mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.cues .ic{width:24px;height:24px;color:var(--teal2)}
+.cues .tx{min-width:0}
+.cues .tx b{display:block;font-weight:600;overflow-wrap:anywhere}
+.cues .tx small{display:block;color:var(--muted);font-size:12px}
+.cues .ln{font:500 12px var(--mono);color:var(--muted)}
+.cues li.past button{opacity:.45}
+.cues li.next button{border-color:var(--teal);box-shadow:inset 3px 0 0 var(--teal)}
+#cueSheet{max-height:82vh}
+#cueSheet .head{display:flex;justify-content:space-between;align-items:center;gap:10px}
 #toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--sab) + 140px);z-index:40;background:rgba(0,0,0,.92);border:1px solid var(--graphite);padding:8px 14px;font-size:13.5px;max-width:90vw;text-align:center;box-shadow:inset 3px 0 0 var(--teal)}
 dialog{background:var(--carbon);color:var(--ink);border:1px solid var(--graphite);padding:18px;max-width:min(420px,92vw)}
 dialog::backdrop{background:rgba(0,0,0,.6)}
@@ -103,19 +122,19 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
 </style>
 </head>
 <body>
-<div id="map"><div id="tiles"></div><canvas id="ov"></canvas></div>
+<div id="map" tabindex="0" role="application" aria-label="Map. Arrow keys pan, plus and minus zoom."><div id="tiles" aria-hidden="true"></div><canvas id="ov" aria-hidden="true"></canvas></div>
 <div class="attr">© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors</div>
 
-<div id="banner" hidden><div class="ic" id="bIc"></div><div><div class="dist" id="bDist"></div><div class="txt" id="bTxt"></div><div class="sub" id="bSub"></div></div></div>
-<div id="then" hidden><span>Then</span><span id="thIc"></span><span id="thTxt"></span></div>
+<div id="banner" hidden role="status" aria-live="polite" aria-atomic="true"><div class="ic" id="bIc" aria-hidden="true"></div><div><div class="dist" id="bDist"></div><div class="txt" id="bTxt"></div><div class="sub" id="bSub"></div></div></div>
+<div id="then" hidden><span>Then</span><span id="thIc" aria-hidden="true"></span><span id="thTxt"></span></div>
 
 <div id="fabs" hidden>
-  <button id="fFollow" aria-pressed="true" aria-label="Follow my position" title="Follow me"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3.5"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg></button>
-  <button id="fHead" aria-pressed="false" aria-label="Heading up" title="Heading up / north up"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l5 16-5-4-5 4z"/></svg></button>
-  <button id="fAll" aria-label="Show whole route" title="Whole route"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
-  <button id="fVoice" aria-pressed="true" aria-label="Voice cues" title="Voice"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16 9a4 4 0 010 6M18.5 6.5a8 8 0 010 11"/></svg></button>
+  <button id="fFollow" aria-pressed="true" aria-label="Follow my position" title="Follow me"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3.5"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg></button>
+  <button id="fHead" aria-pressed="false" aria-label="Heading up" title="Heading up / north up"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l5 16-5-4-5 4z"/></svg></button>
+  <button id="fAll" aria-label="Show whole route" title="Whole route"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+  <button id="fVoice" aria-pressed="true" aria-label="Voice cues" title="Voice"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16 9a4 4 0 010 6M18.5 6.5a8 8 0 010 11"/></svg></button>
 </div>
-<div id="gpsWarn" hidden></div>
+<div id="gpsWarn" hidden role="status" aria-live="polite"></div>
 
 <div id="bar" hidden>
   <div class="st lead"><div class="k">Done</div><div class="v" id="sDone">0.00</div></div>
@@ -123,8 +142,9 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
   <div class="st"><div class="k">Time</div><div class="v" id="sTime">0:00</div></div>
   <div class="st"><div class="k">Pace</div><div class="v" id="sPace">–</div></div>
   <div style="display:flex;gap:6px">
-    <button class="round" id="pocketBtn" aria-label="Pocket mode" title="Pocket mode"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="2.5" width="12" height="19" rx="1.5"/><path d="M10 18.5h4"/></svg></button>
-    <button class="round" id="menuBtn" aria-label="Menu" title="Menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    <button class="round" id="cuesBtn" aria-label="All turns" title="All turns"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6h.01M4 12h.01M4 18h.01" stroke-width="3" stroke-linecap="round"/></svg></button>
+    <button class="round" id="pocketBtn" aria-label="Pocket mode" title="Pocket mode"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="2.5" width="12" height="19" rx="1.5"/><path d="M10 18.5h4"/></svg></button>
+    <button class="round" id="menuBtn" aria-label="Menu" title="Menu"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
   </div>
 </div>
 
@@ -132,10 +152,11 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
 <div class="sheet" id="startSheet" hidden>
   <div class="eyebrow">Run Nav</div>
   <h1 id="rName">Route</h1>
-  <canvas id="preview"></canvas>
+  <canvas id="preview" role="img" aria-label="Route outline"></canvas>
   <div class="facts"><div class="fact"><div class="k">Distance</div><div class="v" id="rDist">–</div></div><div class="fact"><div class="k">Turns</div><div class="v" id="rTurns">–</div></div><div class="fact"><div class="k">To start</div><div class="v" id="rAway">–</div></div></div>
   <p class="hint" id="rStart"></p>
   <button class="btn primary" id="goBtn">Start navigation</button>
+  <button class="btn" id="cuesBtn2">See all turns</button>
   <div class="row2"><a class="btn" id="dirBtn" target="_blank" rel="noopener">Directions to start</a><button class="btn" id="otherBtn">Open in another app</button></div>
   <p class="hint">Keep this page open with the screen on: phones stop sharing GPS with web pages when locked. Use <b>pocket mode</b> for a dark, locked screen with voice cues. For a fully locked phone, <b>Open in another app</b> sends the route to a nav app such as OsmAnd (free).</p>
   <button class="btn" id="demoBtn">Preview the run (simulated)</button>
@@ -144,12 +165,12 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
   <div class="eyebrow">Run Nav</div>
   <h1>Turn-by-turn for your run</h1>
   <p class="hint">Open a route link or QR code from Shape Route Builder, or load any GPX file.</p>
-  <label class="btn primary" for="gpxFile" style="cursor:pointer">Open a GPX file</label>
+  <button class="btn primary" id="gpxBtn" type="button">Open a GPX file</button>
   <input type="file" id="gpxFile" accept=".gpx,application/gpx+xml,application/xml,text/xml" hidden>
   <div id="recentWrap" hidden><div class="eyebrow">Recent routes</div><div class="list" id="recent"></div></div>
 </div>
 <div class="scrim" id="scrim" hidden></div>
-<div class="sheet" id="menuSheet" hidden>
+<div class="sheet" id="menuSheet" hidden role="dialog" aria-modal="true" aria-label="Run menu">
   <div class="eyebrow">Run</div>
   <label class="toggle">Voice cues<input type="checkbox" id="mVoice" checked></label>
   <label class="toggle">Mile updates<input type="checkbox" id="mMiles" checked></label>
@@ -159,12 +180,17 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
   <button class="btn" id="mClose">Close</button>
 </div>
 
+<div class="sheet" id="cueSheet" hidden role="dialog" aria-modal="true" aria-labelledby="cueTitle">
+  <div class="head"><div class="eyebrow" id="cueTitle">All turns</div><button class="btn" id="cueClose" style="min-height:40px">Close</button></div>
+  <p class="hint" id="cueInfo"></p>
+  <ol class="cues" id="cueList"></ol>
+</div>
 <div id="pocket" hidden>
   <div class="pic" id="pIc"></div>
   <div class="pd" id="pDist"></div>
   <div class="pt" id="pTxt"></div>
   <div class="ps" id="pStat"></div>
-  <div id="hold"><svg viewBox="0 0 124 124"><circle cx="62" cy="62" r="60"/></svg>Hold to unlock</div>
+  <button id="hold" type="button" aria-label="Hold to unlock"><svg viewBox="0 0 124 124" aria-hidden="true"><circle cx="62" cy="62" r="60"/></svg>Hold to unlock</button>
 </div>
 
 <dialog id="shareDlg">
@@ -174,7 +200,7 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
   <div class="row2"><button class="btn" id="shCopy">Copy link</button><button class="btn" id="shSend">Send…</button></div>
   <button class="btn" id="shClose" style="width:100%;margin-top:8px">Close</button>
 </dialog>
-<div id="toast" hidden></div>
+<div id="toast" hidden role="status" aria-live="polite"></div>
 
 <script>
 // Copyright (c) 2009 Kazuhiko Arase
@@ -357,6 +383,11 @@ function fitRoute(pad=60){ if(!R.ll.length) return; let a=1e9,b=-1e9,c=1e9,d=-1e
 function panBy(dx,dy){ const z=Math.round(MAP.zf), sc=2**(MAP.zf-z), c=Math.cos(-MAP.rot), s=Math.sin(-MAP.rot), ux=(dx*c-dy*s)/sc, uy=(dx*s+dy*c)/sc;
   MAP.lon=x2lon(lon2x(MAP.lon,z)-ux,z); MAP.lat=y2lat(lat2y(MAP.lat,z)-uy,z); draw(); }
 addEventListener('resize',resize);
+$('map').addEventListener('keydown',e=>{ const k=e.key, step=80;
+  if(k==='+'||k==='='){ MAP.zf=clamp(MAP.zf+0.5,3,19.5); draw(); }
+  else if(k==='-'||k==='_'){ MAP.zf=clamp(MAP.zf-0.5,3,19.5); draw(); }
+  else if(k.startsWith('Arrow')){ if(MAP.follow&&NAV.on) setFollow(false); panBy(k==='ArrowLeft'?step:k==='ArrowRight'?-step:0,k==='ArrowUp'?step:k==='ArrowDown'?-step:0); }
+  else return; e.preventDefault(); });
 
 /* ---------------- voice ---------------- */
 const VOICE={on:store.get('rnVoice',true),miles:store.get('rnMiles',true),unlocked:false};
@@ -433,14 +464,14 @@ let wake=null;
 async function keepAwake(){ try{ if('wakeLock' in navigator&&document.visibilityState==='visible'){ wake=await navigator.wakeLock.request('screen'); } }catch(e){} }
 document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible'&&NAV.on) keepAwake(); });
 function startGps(){ if(NAV.watch!=null||NAV.demo) return; if(!('geolocation' in navigator)){ toast('This browser has no GPS access.'); return; }
-  NAV.watch=navigator.geolocation.watchPosition(p=>onFix({lat:p.coords.latitude,lon:p.coords.longitude,acc:p.coords.accuracy||30,heading:p.coords.heading,speed:p.coords.speed,t:p.timestamp}),
+  NAV.watch=navigator.geolocation.watchPosition(p=>{ const f={lat:p.coords.latitude,lon:p.coords.longitude,acc:p.coords.accuracy||30,heading:p.coords.heading,speed:p.coords.speed,t:p.timestamp}; if(NAV.demo){ NAV.realFix=f; return; } onFix(f); },
     e=>{ $('gpsWarn').hidden=false; $('gpsWarn').textContent=e.code===1?'Location is blocked. Allow it for this site in your browser settings.':'Looking for GPS…'; },
     {enableHighAccuracy:true,maximumAge:1000,timeout:30000}); }
 function updateAway(){ if(!NAV.fix||!R.ll.length) return; const [x,y]=toXY(NAV.fix.lat,NAV.fix.lon), d=Math.hypot(x-R.xy[0][0],y-R.xy[0][1]); const [v,u]=fmtDist(d); $('rAway').textContent=v+' '+u; }
 
 /* ---------------- start / stop ---------------- */
 function begin(demo=false){
-  NAV.on=true; NAV.demo=demo; NAV.s=null; NAV.said.clear(); NAV.mile=0; NAV.done=false; NAV.offOn=false; NAV.off=0; NAV.t0=Date.now();
+  NAV.on=true; NAV.demo=demo; if(demo){ NAV.fix=null; NAV.head=null; NAV.lastXY=null; } NAV.s=null; NAV.said.clear(); NAV.mile=0; NAV.done=false; NAV.offOn=false; NAV.off=0; NAV.t0=Date.now();
   $('startSheet').hidden=true; $('bar').hidden=false; $('fabs').hidden=false;
   // a gesture is needed before speech works on iPhones
   if('speechSynthesis' in window){ try{ const u=new SpeechSynthesisUtterance(' '); u.volume=0; speechSynthesis.speak(u); }catch(e){} }
@@ -449,7 +480,7 @@ function begin(demo=false){
   if(demo) runDemo(); else { startGps(); if(NAV.fix) onFix(NAV.fix); else update(); }
   store.set('rnActive',{key:currentKey(),t0:NAV.t0});
 }
-function end(){ NAV.on=false; if(NAV.demo){ NAV.demo=false; clearInterval(DEMO.t); } NAV.s=null; NAV.next=null; try{ wake&&wake.release(); }catch(e){} wake=null;
+function end(){ NAV.on=false; if(NAV.demo){ NAV.demo=false; clearInterval(DEMO.t); if(NAV.realFix){ NAV.fix=NAV.realFix; NAV.head=null; NAV.lastXY=null; } } NAV.s=null; NAV.next=null; try{ wake&&wake.release(); }catch(e){} wake=null;
   $('bar').hidden=$('fabs').hidden=$('banner').hidden=$('then').hidden=true; $('pocket').hidden=true; $('startSheet').hidden=false; store.set('rnActive',null); fitRoute(); }
 // simulated run: walks the route at ~9 min/mile pace, sped up, with a little GPS wobble
 const DEMO={t:null,s:0};
@@ -459,12 +490,13 @@ function runDemo(){ DEMO.s=0; clearInterval(DEMO.t); const speed=2.98*12; // met
     if(DEMO.s>R.total+30){ clearInterval(DEMO.t); } },500); }
 
 /* ---------------- pocket mode ---------------- */
-function pocket(on){ $('pocket').hidden=!on; if(on){ keepAwake(); pocketUpdate(); toast('Pocket mode: voice cues on, screen locked. Hold the circle to unlock.'); } }
+function pocket(on){ $('pocket').hidden=!on; if(!on) $('pocketBtn').focus(); if(on){ $('hold').focus(); keepAwake(); pocketUpdate(); toast('Pocket mode: voice cues on, screen locked. Hold the circle to unlock.'); } }
 function pocketUpdate(){ if($('pocket').hidden) return; const nc=NAV.next; if(!nc) return; $('pIc').innerHTML=arrowSvg(NAV.offOn?'OFF':nc.k); const [d,u]=NAV.offOn?['Off','route']:fmtDist(Math.max(0,nc.s-(NAV.s??0)));
   $('pDist').textContent=`${d} ${u}`; $('pTxt').textContent=NAV.offOn?'Head back to the route':cueText(nc); $('pStat').textContent=`${$('sDone').textContent} / ${(R.total/MI).toFixed(2)} mi · ${$('sTime').textContent}`; }
 (()=>{ const h=$('hold'); let t=null; const stop=()=>{ h.classList.remove('on'); clearTimeout(t); };
   h.addEventListener('pointerdown',e=>{ e.preventDefault(); h.classList.add('on'); t=setTimeout(()=>{ stop(); pocket(false); },1200); });
   h.addEventListener('pointerup',stop); h.addEventListener('pointerleave',stop); h.addEventListener('pointercancel',stop);
+  h.addEventListener('keydown',e=>{ if((e.key==='Enter'||e.key===' ')&&!e.repeat){ e.preventDefault(); h.classList.add('on'); t=setTimeout(()=>{ stop(); pocket(false); },1200); } }); h.addEventListener('keyup',stop); h.addEventListener('click',e=>e.preventDefault());
   $('pocket').addEventListener('contextmenu',e=>e.preventDefault()); })();
 
 /* ---------------- sharing ---------------- */
@@ -489,7 +521,7 @@ function remember(){ const list=store.get('rnRecent',[]).filter(r=>r.name+'|'+r.
 function load(src,{save=true}={}){
   R.src=src; prepare(src); if(save) remember();
   $('landSheet').hidden=true; $('startSheet').hidden=false;
-  $('rName').textContent=R.name; $('rDist').textContent=(R.total/MI).toFixed(2)+' mi'; $('rTurns').textContent=String(R.cues.filter(c=>c.k!=='START'&&c.k!=='END'&&c.k!=='S').length);
+  $('cuesBtn2').textContent=`See all ${R.cues.filter(c=>c.k!=='START'&&c.k!=='END').length} turns`; $('rName').textContent=R.name; $('rDist').textContent=(R.total/MI).toFixed(2)+' mi'; $('rTurns').textContent=String(R.cues.filter(c=>c.k!=='START'&&c.k!=='END'&&c.k!=='S').length);
   const c0=R.cues[0]; $('rStart').textContent=`Starts ${c0.where?'at '+c0.where:'at the S on the map'}${R.loop?' and loops back there':''}. ${cueText(c0)}.`;
   const [la,lo]=R.ll[0]; $('dirBtn').href=`https://www.google.com/maps/dir/?api=1&destination=${la.toFixed(6)},${lo.toFixed(6)}&travelmode=walking`;
   document.title=R.name+' · Run Nav'; MAP.follow=false; fitRoute(); drawPreview(); startGps(); }
@@ -502,7 +534,31 @@ function drawPreview(){ const cv=$('preview'), r=cv.getBoundingClientRect(), d=d
 function showLanding(){ $('startSheet').hidden=true; $('landSheet').hidden=false; const list=store.get('rnRecent',[]); $('recentWrap').hidden=!list.length; const box=$('recent'); box.innerHTML='';
   for(const r of list){ const b=document.createElement('button'); b.innerHTML='<span></span><small></small>'; b.firstChild.textContent=r.name; b.lastChild.textContent=(r.len/MI).toFixed(1)+' mi';
     b.onclick=()=>load({...r.src,pts:decPoly(r.src.pts)},{save:true}); box.appendChild(b); } }
+$('gpxBtn').onclick=()=>$('gpxFile').click();
 $('gpxFile').addEventListener('change',async e=>{ const f=e.target.files[0]; e.target.value=''; if(!f) return; try{ load(parseGpx(await f.text(),f.name)); history.replaceState(null,'',location.pathname); }catch(err){ toast(err.message||'Could not read that file.'); } });
+
+
+/* ---------------- full cue sheet ---------------- */
+let cueOpener=null;
+function openCues(from){
+  cueOpener=from||document.activeElement; const list=$('cueList'); list.innerHTML='';
+  const s=NAV.on&&NAV.s!=null?NAV.s:-1, nextIdx=NAV.on&&NAV.next?R.cues.indexOf(NAV.next):-1;
+  const turns=R.cues.filter(c=>c.k!=='START'&&c.k!=='END').length;
+  $('cueInfo').textContent=`${(R.total/MI).toFixed(2)} mi · ${turns} turn${turns===1?'':'s'}${s>=0?` · ${((R.total-s)/MI).toFixed(2)} mi to go`:''}. Tap a turn to see it on the map.`;
+  R.cues.forEach((c,i)=>{ const li=document.createElement('li'); if(s>=0&&c.s<s-6&&i!==nextIdx) li.className='past'; if(i===nextIdx) li.className='next';
+    const nxt=R.cues[i+1], leg=nxt?nxt.s-c.s:0;
+    li.innerHTML=`<button type="button"><span class="at"></span><span class="ic" aria-hidden="true">${arrowSvg(c.k)}</span><span class="tx"><b></b><small></small></span><span class="ln"></span></button>`;
+    li.querySelector('.at').textContent=(c.s/MI).toFixed(2); li.querySelector('b').textContent=cueText(c);
+    li.querySelector('small').textContent=c.where?(c.k==='END'?c.where:'at '+c.where):'';
+    li.querySelector('.ln').textContent=leg>0?fmtDist(leg).join(' '):'';
+    li.querySelector('button').setAttribute('aria-label',`Mile ${(c.s/MI).toFixed(2)}: ${cueText(c)}${c.where?', at '+c.where:''}`);
+    li.querySelector('button').onclick=()=>{ closeCues(); setFollow(false); const [la,lo]=R.ll[c.i]; MAP.lat=la; MAP.lon=lo; MAP.zf=Math.max(MAP.zf,17.5); MAP.rot=0; draw();
+      toast(`${cueText(c)}${c.where?' · '+c.where:''}. Tap the target button to follow you again.`,4500); };
+    list.appendChild(li); });
+  $('cueSheet').hidden=$('scrim').hidden=false;
+  const cur=list.querySelector('li.next')||list.firstChild; cur&&cur.scrollIntoView({block:'center'}); (cur&&cur.querySelector('button')||$('cueClose')).focus({preventScroll:true}); }
+function closeCues(){ if($('cueSheet').hidden) return; $('cueSheet').hidden=true; if($('menuSheet').hidden) $('scrim').hidden=true; if(cueOpener&&cueOpener.focus) cueOpener.focus(); }
+$('cuesBtn').onclick=e=>openCues(e.currentTarget); $('cuesBtn2').onclick=e=>openCues(e.currentTarget); $('cueClose').onclick=closeCues;
 
 /* ---------------- wiring ---------------- */
 $('goBtn').onclick=()=>begin(false);
@@ -516,12 +572,13 @@ $('fHead').onclick=()=>setHead(!MAP.headUp); $('mHead').onchange=e=>setHead(e.ta
 const setVoice=on=>{ VOICE.on=on; store.set('rnVoice',on); $('fVoice').setAttribute('aria-pressed',String(on)); $('mVoice').checked=on; if(!on) try{ speechSynthesis.cancel(); }catch(e){} };
 $('fVoice').onclick=()=>{ setVoice(!VOICE.on); toast(VOICE.on?'Voice cues on.':'Voice cues off.'); }; $('mVoice').onchange=e=>setVoice(e.target.checked);
 $('mMiles').onchange=e=>{ VOICE.miles=e.target.checked; store.set('rnMiles',VOICE.miles); }; $('mMiles').checked=VOICE.miles;
-const closeMenu=()=>{ $('menuSheet').hidden=$('scrim').hidden=true; };
-$('menuBtn').onclick=()=>{ $('menuSheet').hidden=$('scrim').hidden=false; }; $('mClose').onclick=closeMenu; $('scrim').onclick=closeMenu;
-$('mEnd').onclick=()=>{ closeMenu(); end(); };
-$('mRestart').onclick=()=>{ closeMenu(); const d=NAV.demo; end(); begin(d); };
+const closeMenu=()=>{ $('menuSheet').hidden=$('scrim').hidden=true; $('menuBtn').focus(); };
+$('menuBtn').onclick=()=>{ $('menuSheet').hidden=$('scrim').hidden=false; $('mVoice').focus(); }; $('mClose').onclick=closeMenu; $('scrim').onclick=()=>{ closeMenu(); closeCues(); };
+$('mEnd').onclick=()=>{ if(NAV.s>50&&!NAV.done&&!confirm('End this run? Your progress will be cleared.')) return; closeMenu(); end(); };
+$('mRestart').onclick=()=>{ if(NAV.s>50&&!NAV.done&&!confirm('Restart from the beginning? Your progress will be cleared.')) return; closeMenu(); const d=NAV.demo; end(); begin(d); };
 $('mShare').onclick=()=>{ closeMenu(); openShare(); };
 setVoice(VOICE.on); setHead(store.get('rnHead',false));
+document.addEventListener('keydown',e=>{ if(e.key!=='Escape') return; if(!$('cueSheet').hidden) closeCues(); else if(!$('menuSheet').hidden) closeMenu(); });
 
 (async()=>{ resize();
   try{ const r=await routeFromHash(location.hash); if(r){ load(r); return; } }catch(e){ toast('That route link looks damaged. Ask for a fresh link or open the GPX file.',6000); }
