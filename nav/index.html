@@ -411,7 +411,7 @@ const WELL=230;                                  // metres ahead where the pull 
 const PART={list:[],energy:0,spawn:0};
 const FX={kind:['well','surge','off'].includes(store.get('rnFx','well'))?store.get('rnFx','well'):'well'};
 /* ---- power surge: the line ahead crackles; sparks get smaller-scale wild the closer you are, arcs jump from you onto it ---- */
-const SURGE={list:[],spawn:0,arcT:0,arcs:[]};
+const SURGE={list:[],spawn:0,arcT:0,arcs:[]}, GRIND={list:[],spawn:0};
 function drawSurge(c,prog,lw){
   const dt=ANIM.frame?Math.min(0.06,ANIM.dt||0.033):0, mpp=156543.03*Math.cos(MAP.lat*Math.PI/180)/2**MAP.zf, live=!NAV.offOn&&!NAV.done, Z=WELL;
   const you=screenOf(DISP.lat,DISP.lon), heat=d=>{ const k=1-Math.min(1,Math.max(0,d)/Z); return k*k; };   // 0 far out → 1 at you
@@ -424,7 +424,7 @@ function drawSurge(c,prog,lw){
     c.beginPath(); c.moveTo(p[0],p[1]); c.lineTo(q[0],q[1]); c.stroke(); }
   // 2. sparks: born on the line, thrown off it; near you they're faster, shorter-lived and twitchier
   // motion is in screen pixels so sparks read the same at any zoom
-  if(live&&dt){ SURGE.spawn+=dt*220; while(SURGE.spawn>=1&&SURGE.list.length<320){ SURGE.spawn--;
+  if(live&&dt){ SURGE.spawn+=dt*120; while(SURGE.spawn>=1&&SURGE.list.length<200){ SURGE.spawn--;
       const d=Z*Math.pow(Math.random(),1.5), e=heat(d), ang=Math.random()*Math.PI*2, sp=(14+260*e)*(0.45+Math.random()*0.9);
       SURGE.list.push({s:prog+d,ox:0,oy:0,vx:Math.cos(ang)*sp,vy:Math.sin(ang)*sp,life:0,max:(0.75-0.45*e)*(0.6+Math.random()*0.8),prev:null,hot:Math.random()}); } }
   const keep=[];
@@ -442,15 +442,34 @@ function drawSurge(c,prog,lw){
     if(dt) p.prev=[x,y]; keep.push(p); }
   SURGE.list=keep;
   // 3. arcs: jagged bolts from you onto the line ahead, and crawling along it; re-struck every ~70 ms
-  if(dt){ SURGE.arcT-=dt; if(SURGE.arcT<=0&&live){ SURGE.arcT=0.04+Math.random()*0.06; SURGE.arcs=[];
-      const n=2+Math.floor(Math.random()*3);
-      for(let i=0;i<n;i++){ const d0=i===0?0:Math.pow(Math.random(),1.5)*70, len=8+Math.random()*(i===0?28:22), pts=[];
-        for(let k=0;k<=8;k++){ const sk=prog+d0+len*k/8, j=(k===0||k===8)?0:gauss()*(3+11*heat(sk-prog)); pts.push([sk,j]); }
-        SURGE.arcs.push({pts,from:i===0,a:0.5+Math.random()*0.5}); } } }
+  if(dt){ SURGE.arcT-=dt; if(SURGE.arcT<=0&&live){ SURGE.arcT=0.07+Math.random()*0.1; SURGE.arcs=[];
+      const n=1+(Math.random()<0.45?1:0);
+      for(let i=0;i<n;i++){ const d0=i===0?0:Math.pow(Math.random(),1.5)*45, len=6+Math.random()*(i===0?16:12), pts=[];
+        for(let k=0;k<=8;k++){ const sk=prog+d0+len*k/8, j=(k===0||k===8)?0:gauss()*(1.2+3.2*heat(sk-prog)); pts.push([sk,j]); }
+        SURGE.arcs.push({pts,from:i===0,a:0.25+Math.random()*0.3}); } } }
   for(const arc of SURGE.arcs){ c.beginPath();
     arc.pts.forEach(([sk,j],k)=>{ const [a,tx,ty]=tan(Math.min(R.total,sk)); let x=a[0]-ty*j, y=a[1]+tx*j; if(arc.from&&k===0){ x=you[0]; y=you[1]; } k?c.lineTo(x,y):c.moveTo(x,y); });
-    c.save(); c.shadowColor='#00D2BE'; c.shadowBlur=10; c.strokeStyle=`rgba(225,255,252,${arc.a.toFixed(3)})`; c.lineWidth=1.3*Math.max(1,lw/8); c.stroke(); c.restore(); }
-  // 4. a crackle of light at you
+    c.save(); c.shadowColor='#00D2BE'; c.shadowBlur=5; c.strokeStyle=`rgba(200,255,250,${arc.a.toFixed(3)})`; c.lineWidth=0.9*Math.max(1,lw/9); c.stroke(); c.restore(); }
+  // 4. grinder sparks: a dense spray where you meet the line. White-hot streaks fan back past you,
+  //    slow down, curl slightly and cool through amber to dull orange before they die.
+  if(live){ const [cp,tx,ty]=tan(Math.min(R.total,prog+4)), back=Math.atan2(-ty,-tx);
+    if(dt){ GRIND.spawn+=dt*(260+120*Math.random()); while(GRIND.spawn>=1&&GRIND.list.length<420){ GRIND.spawn--;
+        const ang=back+gauss()*0.75, sp=(140+300*Math.random())*Math.max(1,lw/8);
+        GRIND.list.push({x:cp[0]+gauss()*1.5,y:cp[1]+gauss()*1.5,vx:Math.cos(ang)*sp,vy:Math.sin(ang)*sp,life:0,max:0.18+Math.random()*0.42,curl:gauss()*2.2,px:null,py:null}); } }
+    const g2=[];
+    for(const p of GRIND.list){ p.life+=dt; if(p.life>p.max) continue; const k=p.life/p.max;
+      if(dt){ p.px=p.x; p.py=p.y; const dr=Math.exp(-dt*3.2), ca=Math.cos(p.curl*dt), sa=Math.sin(p.curl*dt), vx=p.vx*ca-p.vy*sa, vy=p.vx*sa+p.vy*ca;
+        p.vx=vx*dr; p.vy=vy*dr; p.x+=p.vx*dt; p.y+=p.vy*dt; }
+      // colour by temperature: white → yellow → amber → dull orange
+      const col=k<0.2?[255,252,235]:k<0.45?[255,226,120]:k<0.75?[255,170,40]:[230,90,20], a=(1-k)*(k<0.2?1:0.85);
+      c.strokeStyle=`rgba(${col[0]},${col[1]},${col[2]},${a.toFixed(3)})`; c.lineWidth=(k<0.3?1.4:1)*Math.max(1,lw/9);
+      c.beginPath(); if(p.px!=null){ const sx=p.x+(p.px-p.x)*2.2, sy=p.y+(p.py-p.y)*2.2; c.moveTo(sx,sy); } else c.moveTo(p.x,p.y); c.lineTo(p.x+0.01,p.y); c.stroke();
+      g2.push(p); }
+    GRIND.list=g2;
+    const hot=c.createRadialGradient(cp[0],cp[1],0,cp[0],cp[1],9+Math.random()*4); hot.addColorStop(0,'rgba(255,250,230,.95)'); hot.addColorStop(0.5,'rgba(255,190,60,.45)'); hot.addColorStop(1,'rgba(255,150,30,0)');
+    c.fillStyle=hot; c.beginPath(); c.arc(cp[0],cp[1],14,0,7); c.fill(); }
+  else GRIND.list=[];
+  // 5. a crackle of light at you
   const g=c.createRadialGradient(you[0],you[1],2,you[0],you[1],30+(dt?Math.random()*10:5));
   g.addColorStop(0,'rgba(230,255,252,.55)'); g.addColorStop(0.4,'rgba(0,210,190,.25)'); g.addColorStop(1,'rgba(0,210,190,0)');
   c.fillStyle=g; c.beginPath(); c.arc(you[0],you[1],40,0,7); c.fill();
@@ -613,7 +632,7 @@ function begin(demo=false){
   $('startSheet').hidden=true; $('bar').hidden=false; $('fabs').hidden=false;
   // a gesture is needed before speech works on iPhones
   if('speechSynthesis' in window){ try{ const u=new SpeechSynthesisUtterance(' '); u.volume=0; speechSynthesis.speak(u); }catch(e){} }
-  keepAwake(); setFollow(true); MAP.zf=17; PART.list=[]; PART.energy=0; SURGE.list=[]; SURGE.arcs=[]; ANIM.last=0; animStart();
+  keepAwake(); setFollow(true); MAP.zf=17; PART.list=[]; PART.energy=0; SURGE.list=[]; SURGE.arcs=[]; GRIND.list=[]; ANIM.last=0; animStart();
   const c0=R.cues[0]; say(`Head ${COMPASS(R.startHead)}${c0.onto?' on '+speakName(c0.onto):''}.`);
   if(demo) runDemo(); else { startGps(); if(NAV.fix) onFix(NAV.fix); else update(); }
   store.set('rnActive',{key:currentKey(),t0:NAV.t0});
