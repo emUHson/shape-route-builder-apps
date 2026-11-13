@@ -126,6 +126,7 @@ function drawTiles(){
     im.style.left=(tx*256-cx)+'px'; im.style.top=(ty*256-cy)+'px'; }
   for(const [k,im] of tileEls) if(!want.has(k)){ im.remove(); tileEls.delete(k); } }
 function drawOverlay(){
+  const cg=document.getElementById('compassG'); if(cg) cg.setAttribute('transform',`rotate(${(MAP.rot*180/Math.PI).toFixed(1)} 12 12)`);
   const c=octx, d=MAP.dpr; c.setTransform(d,0,0,d,0,0); c.clearRect(0,0,MAP.W,MAP.H);
   if(!R.ll.length) return;
   const P=R.ll.map(p=>screenOf(p[0],p[1])), prog=DISP.s??NAV.s??0, lw=clamp(2**(MAP.zf-16)*7,4,11);
@@ -187,7 +188,7 @@ const WELL=230;                                  // metres ahead where the pull 
 const PART={list:[],energy:0,spawn:0};
 // The line ahead: barely lifted two-plus blocks out, building smoothly to a strong glow at the runner.
 function aheadGlow(c,prog,lw){
-  const lite=FX.kind==='chev', z1=Math.min(R.total,prog+WELL), step=lite?10:5;
+  const lite=true, z1=Math.min(R.total,prog+WELL), step=10;
   for(let a=z1;a>prog;a-=step){                         // far → near, so the brighter pieces sit on top
     const b=Math.max(prog,a-step-0.6), k=1-(((a+b)/2)-prog)/WELL, e=Math.pow(Math.max(0,k),2.2);   // gentle far, steep near
     const p=screenOf(...llAt(a)), q=screenOf(...llAt(b));
@@ -202,7 +203,8 @@ const SURGE={list:[],spawn:0,arcT:0,arcs:[]}, GRIND={list:[],spawn:0};
 function drawChevrons(c,prog,lw){
   const gap=16, flow=(ANIM.t*14)%gap;                     // they drift forward at ~14 m/s, so the line reads as moving ahead
   c.save(); c.lineCap='round'; c.lineJoin='round';
-  for(let d=gap-flow+4;d<WELL;d+=gap){ const s0=prog+d; if(s0>R.total-3) break;
+  // d grows with time: the arrows travel away from you, the way you're going
+  for(let d=4+flow;d<WELL;d+=gap){ const s0=prog+d; if(s0>R.total-3) break;
     const k=1-d/WELL, e=Math.pow(k,1.8), a=screenOf(...llAt(s0)), b=screenOf(...llAt(s0+3)), an=Math.atan2(b[1]-a[1],b[0]-a[0]);
     const sz=lw*(0.45+0.7*e), fadeIn=Math.min(1,(d-4)/6);       // the nearest one fades in rather than popping
     c.save(); c.translate(a[0],a[1]); c.rotate(an);
@@ -219,7 +221,7 @@ function drawSurge(c,prog,lw){
   const z1=Math.min(R.total,prog+Z);
   // 2. sparks: born on the line, thrown off it; near you they're faster, shorter-lived and twitchier
   // motion is in screen pixels so sparks read the same at any zoom
-  if(live&&dt){ SURGE.spawn+=dt*240; while(SURGE.spawn>=1&&SURGE.list.length<300){ SURGE.spawn--;
+  if(live&&dt){ SURGE.spawn+=dt*140; while(SURGE.spawn>=1&&SURGE.list.length<170){ SURGE.spawn--;
       const d=Z*Math.pow(Math.random(),1.15), e=heat(d), ang=Math.random()*Math.PI*2, sp=(8+110*e)*(0.45+Math.random()*0.9);
       SURGE.list.push({s:prog+d,ox:0,oy:0,vx:Math.cos(ang)*sp,vy:Math.sin(ang)*sp,life:0,max:(0.8-0.4*e)*(0.6+Math.random()*0.8),prev:null,hot:Math.random()}); } }
   const keep=[];
@@ -250,7 +252,7 @@ function drawSurge(c,prog,lw){
   // 4. grinder sparks: a dense spray where you meet the line. White-hot streaks fan back past you,
   //    slow down, curl slightly and cool through amber to dull orange before they die.
   if(live){ const [cp,tx,ty]=tan(Math.min(R.total,prog+4)), back=Math.atan2(-ty,-tx);
-    if(dt){ GRIND.spawn+=dt*(150+50*Math.random()); while(GRIND.spawn>=1&&GRIND.list.length<240){ GRIND.spawn--;
+    if(dt){ GRIND.spawn+=dt*(100+30*Math.random()); while(GRIND.spawn>=1&&GRIND.list.length<150){ GRIND.spawn--;
         const ang=back+(Math.random()<0.5?-1:1)*(0.32+Math.abs(gauss())*0.16), sp=(100+160*Math.random())*Math.max(1,lw/8);   // two narrow jets just off the trail
         GRIND.list.push({x:cp[0]+gauss()*1,y:cp[1]+gauss()*1,vx:Math.cos(ang)*sp,vy:Math.sin(ang)*sp,life:0,max:0.12+Math.random()*0.24,curl:gauss()*1.2,px:null,py:null}); } }
     const g2=[];
@@ -276,7 +278,7 @@ const pull=d=>3+14000/Math.pow(d+10,1.75);
 function drawWell(c,prog,lw){
   const dt=ANIM.frame?Math.min(0.06,ANIM.dt||0.033):0, mpp=156543.03*Math.cos(MAP.lat*Math.PI/180)/2**MAP.zf, live=!NAV.offOn&&!NAV.done;
   // spawn: denser further out so the well looks fed from the distance
-  if(live){ PART.spawn+=dt*55; while(PART.spawn>=1&&PART.list.length<160){ PART.spawn--; const d0=40+Math.pow(Math.random(),0.6)*(WELL-40);
+  if(live){ PART.spawn+=dt*34; while(PART.spawn>=1&&PART.list.length<100){ PART.spawn--; const d0=40+Math.pow(Math.random(),0.6)*(WELL-40);
       PART.list.push({s:prog+d0,d0,off:(Math.random()<.5?-1:1)*(4+Math.random()*26),sz:0.6+Math.random()*1.2,hue:Math.random(),prev:null}); } }
   const you=screenOf(DISP.lat,DISP.lon);
   c.save(); c.globalCompositeOperation='lighter'; c.lineCap='round';
@@ -303,7 +305,7 @@ function drawWell(c,prog,lw){
   c.fillStyle=g; c.beginPath(); c.arc(you[0],you[1],r0*2.6,0,7); c.fill();
   c.restore(); }
 function animLoop(ts){ ANIM.raf=0; if(!NAV.on||document.hidden||!$('pocket').hidden) return;
-  if(ts-ANIM.last>=(FX.kind==='chev'||FX.kind==='off'?50:33)){ ANIM.dt=ANIM.last?Math.min(0.25,(ts-ANIM.last)/1000):0.033; ANIM.last=ts; ANIM.t=ts/1000; ANIM.frame=true;
+  if(ts-ANIM.last>=(FX.kind==='chev'||FX.kind==='off'?50:40)){ ANIM.dt=ANIM.last?Math.min(0.25,(ts-ANIM.last)/1000):0.033; ANIM.last=ts; ANIM.t=ts/1000; ANIM.frame=true;
     stepDisplay(ANIM.dt); followNow(); turnCall(); if(MAP.follow) draw(); else drawOverlay(); ANIM.frame=false; }
   ANIM.raf=requestAnimationFrame(animLoop); }
 function animStart(){ if(!ANIM.raf) ANIM.raf=requestAnimationFrame(animLoop); }
@@ -330,6 +332,8 @@ function fitRoute(pad=60){ if(!R.ll.length) return; let a=1e9,b=-1e9,c=1e9,d=-1e
 function panBy(dx,dy){ const z=Math.round(MAP.zf), sc=2**(MAP.zf-z), c=Math.cos(-MAP.rot), s=Math.sin(-MAP.rot), ux=(dx*c-dy*s)/sc, uy=(dx*s+dy*c)/sc;
   MAP.lon=x2lon(lon2x(MAP.lon,z)-ux,z); MAP.lat=y2lat(lat2y(MAP.lat,z)-uy,z); draw(); }
 addEventListener('resize',resize);
+function vvInset(){ const vv=window.visualViewport; const b=vv?Math.max(0,Math.round(innerHeight-(vv.height+vv.offsetTop))):0; document.documentElement.style.setProperty('--vvb',b+'px'); }
+if(window.visualViewport){ visualViewport.addEventListener('resize',vvInset); visualViewport.addEventListener('scroll',vvInset); } addEventListener('resize',vvInset); vvInset();
 $('map').addEventListener('keydown',e=>{ const k=e.key, step=80;
   if(k==='+'||k==='='){ MAP.zf=clamp(MAP.zf+0.5,3,19.5); draw(); }
   else if(k==='-'||k==='_'){ MAP.zf=clamp(MAP.zf-0.5,3,19.5); draw(); }
@@ -413,7 +417,7 @@ function stats(){ const s=NAV.s??0, el=(NAV.t0?(Date.now()-NAV.t0)/1000:0)*(NAV.
   $('sPace').textContent=s>160?fmtTime(el/(s/MI)):'–'; }
 function followNow(){ if(MAP.follow&&DISP.lat!=null){ MAP.lat=DISP.lat; MAP.lon=DISP.lon; if(MAP.headUp&&DISP.head!=null) MAP.rot=-(Math.PI/2-DISP.head); else MAP.rot=0; } }
 function drawFollow(){ if(!ANIM.raf){ stepDisplay(1); followNow(); } draw(); }
-function setFollow(on){ MAP.follow=on; $('fFollow').setAttribute('aria-pressed',String(on)); if(on){ if(MAP.zf<16.5) MAP.zf=17; drawFollow(); } }
+function setFollow(on){ MAP.follow=on; $('fFollow').hidden=on||!NAV.on; if(on){ if(MAP.zf<16.5) MAP.zf=17; drawFollow(); } }
 setInterval(()=>{ if(NAV.on&&NAV.t0&&!NAV.done){ stats(); pocketUpdate(); } },1000);
 
 /* ---------------- GPS + screen wake ---------------- */
@@ -429,7 +433,7 @@ function updateAway(){ if(!NAV.fix||!R.ll.length) return; const [x,y]=toXY(NAV.f
 /* ---------------- start / stop ---------------- */
 function begin(demo=false){
   NAV.on=true; NAV.demo=demo; if(demo){ NAV.fix=null; NAV.head=null; NAV.lastXY=null; } NAV.s=null; NAV.v=0; DISP.s=DISP.lat=DISP.lon=DISP.head=null; $('simChip').hidden=!demo; NAV.said.clear(); NAV.mile=0; NAV.done=false; NAV.offOn=false; NAV.off=0; NAV.t0=Date.now();
-  $('startSheet').hidden=true; $('bar').hidden=false; $('fabs').hidden=false;
+  $('startSheet').hidden=true; $('bar').hidden=false; $('fHead').hidden=false;
   // a gesture is needed before speech works on iPhones
   if('speechSynthesis' in window){ try{ const u=new SpeechSynthesisUtterance(' '); u.volume=0; speechSynthesis.speak(u); }catch(e){} }
   keepAwake(); setFollow(true); MAP.zf=17; PART.list=[]; PART.energy=0; SURGE.list=[]; SURGE.arcs=[]; GRIND.list=[]; ANIM.last=0; animStart();
@@ -438,7 +442,7 @@ function begin(demo=false){
   store.set('rnActive',{key:currentKey(),t0:NAV.t0});
 }
 function end(){ NAV.on=false; $('simChip').hidden=true; DISP.s=DISP.lat=DISP.lon=DISP.head=null; if(NAV.demo){ NAV.demo=false; clearInterval(DEMO.t); if(NAV.realFix){ NAV.fix=NAV.realFix; NAV.head=null; NAV.lastXY=null; } } NAV.s=null; NAV.next=null; try{ wake&&wake.release(); }catch(e){} wake=null;
-  $('bar').hidden=$('fabs').hidden=$('banner').hidden=$('then').hidden=true; $('pocket').hidden=true; $('startSheet').hidden=false; store.set('rnActive',null); fitRoute(); }
+  $('bar').hidden=$('fHead').hidden=$('fFollow').hidden=$('banner').hidden=$('then').hidden=true; $('pocket').hidden=true; $('startSheet').hidden=false; store.set('rnActive',null); fitRoute(); }
 // simulated run: walks the route at ~9 min/mile pace, sped up, with a little GPS wobble
 // Simulated phone GPS: one fix a second (like a phone's GPS chip) at a steady ~9:00/mi pace times the preview speed,
 // with slowly wandering error (a few metres), reported accuracy, course and speed.
@@ -536,6 +540,11 @@ function openCues(from){
   $('cueSheet').hidden=$('scrim').hidden=false;
   const cur=list.querySelector('li.next')||list.firstChild; cur&&cur.scrollIntoView({block:'center'}); (cur&&cur.querySelector('button')||$('cueClose')).focus({preventScroll:true}); }
 function closeCues(){ if($('cueSheet').hidden) return; $('cueSheet').hidden=true; if($('menuSheet').hidden) $('scrim').hidden=true; if(cueOpener&&cueOpener.focus) cueOpener.focus(); }
+(()=>{ const hd=$('cueHead'), sh=$('cueSheet'); let y0=null;
+  hd.addEventListener('pointerdown',e=>{ if(e.target.closest('button')) return; y0=e.clientY; hd.setPointerCapture(e.pointerId); });
+  hd.addEventListener('pointermove',e=>{ if(y0==null) return; const dy=Math.max(0,e.clientY-y0); sh.style.transform=`translateY(${dy}px)`; });
+  const up=e=>{ if(y0==null) return; const dy=e.clientY-y0; y0=null; sh.style.transform=''; if(dy>70) closeCues(); };
+  hd.addEventListener('pointerup',up); hd.addEventListener('pointercancel',up); })();
 $('cuesBtn').onclick=e=>openCues(e.currentTarget); $('cuesBtn2').onclick=e=>openCues(e.currentTarget); $('cueClose').onclick=closeCues;
 
 /* ---------------- full screen ---------------- */
@@ -545,8 +554,8 @@ const fsEl=document.documentElement, fsOK=!!(fsEl.requestFullscreen||fsEl.webkit
 const isFull=()=>!!(document.fullscreenElement||document.webkitFullscreenElement);
 function goFull(){ if(!fsOK||isFull()) return; try{ const p=(fsEl.requestFullscreen||fsEl.webkitRequestFullscreen).call(fsEl,{navigationUI:'hide'}); p&&p.catch&&p.catch(()=>{}); }catch(e){} }
 function exitFull(){ try{ (document.exitFullscreen||document.webkitExitFullscreen).call(document); }catch(e){} }
-const fsUI=()=>{ $('fFull').setAttribute('aria-pressed',String(isFull())); $('fFull').setAttribute('aria-label',isFull()?'Leave full screen':'Full screen'); };
-$('fFull').hidden=!fsOK; $('fFull').onclick=()=>{ isFull()?exitFull():goFull(); };
+const fsUI=()=>{ $('fFull').textContent=isFull()?'Leave full screen':'Full screen'; document.documentElement.classList.toggle('fs',isFull()); vvInset(); };
+$('fFull').hidden=!fsOK; $('fFull').onclick=()=>{ closeMenu(); if(isFull()) exitFull(); else { fsAuto=true; goFull(); } };
 let fsAuto=true;   // once you leave full screen yourself, taps stop putting it back
 const fsChange=()=>{ fsUI(); if(!isFull()) fsAuto=false; };
 document.addEventListener('fullscreenchange',fsChange); document.addEventListener('webkitfullscreenchange',fsChange);
@@ -557,12 +566,13 @@ $('goBtn').onclick=()=>{ fsAuto=true; goFull(); begin(false); };
 $('demoBtn').onclick=()=>{ fsAuto=true; goFull(); begin(true); };
 $('otherBtn').onclick=openElsewhere; $('mOther').onclick=()=>{ closeMenu(); openElsewhere(); };
 $('pocketBtn').onclick=askPocket;
-$('fFollow').onclick=()=>setFollow(!MAP.follow);
-$('fAll').onclick=()=>{ setFollow(false); fitRoute(); };
-const setHead=on=>{ MAP.headUp=on; $('fHead').setAttribute('aria-pressed',String(on)); $('mHead').checked=on; store.set('rnHead',on); if(!on) MAP.rot=0; drawFollow(); };
+$('fFollow').onclick=()=>setFollow(true);
+$('fAll').onclick=()=>{ closeMenu(); setFollow(false); fitRoute(); };
+const setHead=on=>{ MAP.headUp=on; $('fHead').setAttribute('aria-pressed',String(on)); $('fHead').setAttribute('aria-label',on?'Map turns with you. Tap to face north.':'Map faces north. Tap to turn the map with you.'); $('mHead').checked=on; store.set('rnHead',on); if(!on) MAP.rot=0;
+  if(NAV.on) setFollow(true); else drawFollow(); };   // switching modes always re-centres on you
 $('fHead').onclick=()=>setHead(!MAP.headUp); $('mHead').onchange=e=>setHead(e.target.checked);
-const setVoice=on=>{ VOICE.on=on; store.set('rnVoice',on); $('fVoice').setAttribute('aria-pressed',String(on)); $('mVoice').checked=on; if(!on) try{ speechSynthesis.cancel(); }catch(e){} };
-$('fVoice').onclick=()=>{ setVoice(!VOICE.on); toast(VOICE.on?'Voice cues on.':'Voice cues off.'); }; $('mVoice').onchange=e=>setVoice(e.target.checked);
+const setVoice=on=>{ VOICE.on=on; store.set('rnVoice',on); $('mVoice').checked=on; if(!on) try{ speechSynthesis.cancel(); }catch(e){} };
+$('mVoice').onchange=e=>setVoice(e.target.checked);
 $('mMiles').onchange=e=>{ VOICE.miles=e.target.checked; store.set('rnMiles',VOICE.miles); }; $('mMiles').checked=VOICE.miles;
 const leadLabel=()=>{ $('mLeadV').textContent=VOICE.leadFt?`${VOICE.leadFt} ft before`:'At the turn'; };
 $('mLead').value=VOICE.leadFt; leadLabel();

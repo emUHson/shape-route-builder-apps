@@ -35,7 +35,7 @@ button,a,label,input{touch-action:manipulation}
 #tiles{position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform;filter:invert(1) hue-rotate(180deg) brightness(.82) contrast(.92) saturate(.25)}
 #tiles img{position:absolute;width:256px;height:256px;user-select:none;-webkit-user-drag:none;pointer-events:none}
 #ov{position:absolute;inset:0;pointer-events:none}
-.attr{position:fixed;right:6px;bottom:calc(var(--sab) + 4px);font-size:10px;color:#777;z-index:3;pointer-events:auto}
+.attr{position:fixed;right:6px;bottom:calc(var(--bot) + 4px);font-size:10px;color:#777;z-index:3;pointer-events:auto}
 .attr a{color:#888}
 
 /* next-turn banner */
@@ -51,7 +51,7 @@ button,a,label,input{touch-action:manipulation}
 #then svg{width:18px;height:18px;color:var(--silver)}
 
 /* bottom bar */
-#bar{position:fixed;left:0;right:0;bottom:0;z-index:5;background:rgba(0,0,0,.92);border-top:1px solid var(--graphite);padding:10px 12px calc(var(--sab) + 10px);display:grid;grid-template-columns:repeat(4,1fr) auto;gap:6px;align-items:center}
+#bar{position:fixed;left:0;right:0;bottom:0;z-index:5;background:rgba(0,0,0,.92);border-top:1px solid var(--graphite);padding:10px 12px var(--bot);display:grid;grid-template-columns:repeat(4,1fr) auto;gap:6px;align-items:center}
 .st .k{font:600 9.5px var(--body);letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
 .st .v{font:700 19px/1.15 var(--mono)}
 .st.lead .v{color:var(--teal2)}
@@ -59,15 +59,15 @@ button,a,label,input{touch-action:manipulation}
 .round svg{width:22px;height:22px}
 #bar .round{height:54px;width:54px;grid-template-rows:22px auto;gap:3px;align-content:center}
 #bar .round span{white-space:nowrap;font:600 8.5px/1 var(--body);letter-spacing:.04em;text-transform:uppercase;color:var(--silver)}
-#fabs{position:fixed;right:10px;bottom:calc(var(--sab) + 84px);z-index:5;display:grid;gap:8px}
+#fabs{position:fixed;right:10px;bottom:calc(var(--bot) + 84px);z-index:5;display:grid;gap:8px}
 #fabs button{width:46px;height:46px;background:rgba(0,0,0,.88);border:1px solid var(--graphite);display:grid;place-items:center;border-radius:2px}
 #fabs button[aria-pressed="true"]{border-color:var(--teal);color:var(--teal2)}
 #fabs svg{width:20px;height:20px}
-#simChip{position:fixed;left:10px;bottom:calc(var(--sab) + 84px);z-index:6;background:rgba(0,0,0,.9);border:1px solid var(--teal);color:var(--teal2);font:600 12px var(--mono);padding:8px 12px;border-radius:2px;letter-spacing:.04em}
-#gpsWarn{position:fixed;left:10px;bottom:calc(var(--sab) + 84px);z-index:5;background:rgba(0,0,0,.9);border:1px solid var(--graphite);padding:6px 10px;font-size:12.5px;color:var(--amber);max-width:60vw}
+#simChip{position:fixed;left:10px;bottom:calc(var(--bot) + 84px);z-index:6;background:rgba(0,0,0,.9);border:1px solid var(--teal);color:var(--teal2);font:600 12px var(--mono);padding:8px 12px;border-radius:2px;letter-spacing:.04em}
+#gpsWarn{position:fixed;left:10px;bottom:calc(var(--bot) + 84px);z-index:5;background:rgba(0,0,0,.9);border:1px solid var(--graphite);padding:6px 10px;font-size:12.5px;color:var(--amber);max-width:60vw}
 
 /* sheets (start, menu) */
-.sheet{overscroll-behavior:contain;position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--carbon);border-top:2px solid transparent;border-image:linear-gradient(90deg,var(--teal),var(--teal2) 40%,transparent) 1;padding:18px 18px calc(var(--sab) + 18px);max-height:88vh;overflow:auto;display:grid;gap:14px}
+.sheet{overscroll-behavior:contain;position:fixed;left:0;right:0;bottom:var(--vvb,0px);z-index:20;background:var(--carbon);border-top:2px solid transparent;border-image:linear-gradient(90deg,var(--teal),var(--teal2) 40%,transparent) 1;padding:18px 18px calc(var(--bot) + 18px);max-height:88vh;overflow:auto;display:grid;gap:14px}
 .sheet h1{text-wrap:balance;font:900 22px/1.05 var(--display);text-transform:uppercase;letter-spacing:.01em;margin:0}
 .eyebrow{font:600 10.5px var(--body);letter-spacing:.16em;text-transform:uppercase;color:var(--silver);display:flex;align-items:center;gap:8px}
 .eyebrow::before{content:"";width:6px;height:6px;background:var(--teal);transform:rotate(45deg)}
@@ -123,8 +123,21 @@ button,a,label,input{touch-action:manipulation}
 .cues li.past button{opacity:.45}
 .cues li.next button{border-color:var(--teal);box-shadow:inset 3px 0 0 var(--teal)}
 #cueSheet{max-height:82vh}
+/* bottom inset: the phone's own safe area, at least 12px, plus anything the browser lays over the page (Chrome's bars) */
+:root{--bot:calc(max(var(--sab),12px) + var(--vvb,0px))}
+html.fs{--bot:calc(max(var(--sab),12px) + var(--vvb,0px) + 30px)}
+#fHead{position:fixed;right:10px;top:calc(var(--sat) + 20px + var(--bh,110px));z-index:5;width:46px;height:46px;border-radius:50%;background:rgba(0,0,0,.88);border:1px solid var(--graphite);display:grid;place-items:center;padding:0}
+#fHead svg{width:26px;height:26px;color:var(--silver);grid-area:1/1}
+#fHead span{grid-area:1/1;font:700 8px var(--mono);color:#000;transform:translateY(-1px);pointer-events:none;opacity:0}
+#fHead[aria-pressed="true"]{border-color:var(--teal)}
+#fFollow{position:fixed;right:10px;bottom:calc(var(--bot) + 84px);z-index:6;display:flex;align-items:center;gap:8px;background:rgba(0,0,0,.92);border:1px solid var(--teal);color:var(--teal2);font:600 13px var(--body);text-transform:uppercase;letter-spacing:.08em;padding:11px 18px;border-radius:2px;min-height:44px}
+#fFollow svg{width:16px;height:16px}
+#cueSheet{padding-top:0}
+#cueSheet .head{display:block;position:sticky;top:0;z-index:2;background:var(--carbon);padding:10px 0 10px;margin:0;border-bottom:1px solid var(--graphite);touch-action:none}
+#cueSheet .grab{width:44px;height:4px;background:var(--gun);margin:0 auto 8px;border-radius:2px}
+
 #cueSheet .head{display:flex;justify-content:space-between;align-items:center;gap:10px}
-#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--sab) + 140px);z-index:40;background:rgba(0,0,0,.92);border:1px solid var(--graphite);padding:8px 14px;font-size:13.5px;max-width:90vw;text-align:center;box-shadow:inset 3px 0 0 var(--teal)}
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--bot) + 140px);z-index:40;background:rgba(0,0,0,.92);border:1px solid var(--graphite);padding:8px 14px;font-size:13.5px;max-width:90vw;text-align:center;box-shadow:inset 3px 0 0 var(--teal)}
 dialog{background:var(--carbon);color:var(--ink);border:1px solid var(--graphite);padding:18px;max-width:min(420px,92vw)}
 dialog::backdrop{background:rgba(0,0,0,.6)}
 #qrBox{background:#fff;padding:12px;display:grid;place-items:center}
@@ -138,13 +151,8 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
 <div id="banner" hidden role="status" aria-live="polite" aria-atomic="true"><div class="ic" id="bIc" aria-hidden="true"></div><div><div class="dist" id="bDist"></div><div class="txt" id="bTxt"></div><div class="sub" id="bSub"></div></div></div>
 <div id="then" hidden><span>Then</span><span id="thIc" aria-hidden="true"></span><span id="thTxt"></span></div>
 
-<div id="fabs" hidden>
-  <button id="fFollow" aria-pressed="true" aria-label="Follow my position" title="Follow me"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3.5"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg></button>
-  <button id="fHead" aria-pressed="false" aria-label="Heading up" title="Heading up / north up"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l5 16-5-4-5 4z"/></svg></button>
-  <button id="fAll" aria-label="Show whole route" title="Whole route"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
-  <button id="fFull" aria-pressed="false" aria-label="Full screen"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></svg></button>
-  <button id="fVoice" aria-pressed="true" aria-label="Voice cues" title="Voice"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16 9a4 4 0 010 6M18.5 6.5a8 8 0 010 11"/></svg></button>
-</div>
+<button id="fHead" type="button" hidden aria-pressed="false" aria-label="Map faces north. Tap to turn the map with you."><svg aria-hidden="true" viewBox="0 0 24 24"><g id="compassG"><path d="M12 3l4 9h-8z" fill="#FF4D45"/><path d="M12 21l-4-9h8z" fill="currentColor"/></g></svg><span id="fHeadTxt">N</span></button>
+<button id="fFollow" type="button" hidden aria-label="Re-center on my position"><svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3l7 18-7-4-7 4z"/></svg>Re-center</button>
 <div id="gpsWarn" hidden role="status" aria-live="polite"></div>
 <button id="simChip" type="button" hidden></button>
 
@@ -195,6 +203,7 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
   <div class="toggle"><label for="mPocketLvl">Pocket mode brightness</label><select id="mPocketLvl"><option value="0">Dimmest</option><option value="1">Dim</option><option value="2">Medium</option><option value="3">Bright</option></select></div>
   <p class="hint" id="mHapticNote"></p>
   <label class="toggle">Heading up (map turns with you)<input type="checkbox" id="mHead"></label>
+  <div class="row2"><button class="btn" id="fAll">Show whole route</button><button class="btn" id="fFull">Full screen</button></div>
   <label class="toggle" for="mFx">Route effect<select id="mFx"><option value="well">Gravity well</option><option value="surge">Power surge</option><option value="chev">Chevrons (light)</option><option value="off">Off (saves battery)</option></select></label>
   <div class="row2"><button class="btn" id="mShare">Share route</button><button class="btn" id="mOther">Open in another app (GPX)</button></div>
   <div class="row2"><button class="btn" id="mRestart">Restart run</button><button class="btn" id="mEnd">End run</button></div>
@@ -202,7 +211,7 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
 </div>
 
 <div class="sheet" id="cueSheet" hidden role="dialog" aria-modal="true" aria-labelledby="cueTitle">
-  <div class="head"><div class="eyebrow" id="cueTitle">All turns</div><button class="btn" id="cueClose" style="min-height:40px">Close</button></div>
+  <div class="head" id="cueHead"><div class="grab" aria-hidden="true"></div><div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><div class="eyebrow" id="cueTitle">All turns</div><button class="btn" id="cueClose" style="min-height:40px">Close</button></div></div>
   <p class="hint" id="cueInfo"></p>
   <ol class="cues" id="cueList"></ol>
 </div>
