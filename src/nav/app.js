@@ -153,7 +153,7 @@ function drawOverlay(){
   const nc=NAV.next; if(nc&&nc.k!=='START'){ const q=screenOf(...R.ll[nc.i]); c.beginPath(); c.arc(q[0],q[1],lw*0.9,0,7); c.fillStyle='#fff'; c.fill(); c.lineWidth=2.5; c.strokeStyle='#000'; c.stroke(); }
   // start / finish
   const s0=P[0]; c.beginPath(); c.arc(s0[0],s0[1],9,0,7); c.fillStyle='#fff'; c.fill(); c.fillStyle='#000'; c.font='700 10px system-ui'; c.textAlign='center'; c.textBaseline='middle'; c.fillText('S',s0[0],s0[1]+0.5);
-  if(running&&!calm&&DISP.lat!=null) drawWell(c,prog,lw);
+  if(running&&!calm&&DISP.lat!=null){ if(FX.kind==='well') drawWell(c,prog,lw); else if(FX.kind==='surge') drawSurge(c,prog,lw); }
   // you
   if(NAV.fix&&DISP.lat!=null){ const q=screenOf(DISP.lat,DISP.lon), mpp=156543.03*Math.cos(DISP.lat*Math.PI/180)/2**MAP.zf, rr=(DISP.s!=null?0:NAV.fix.acc)/mpp;
     if(rr>12){ c.beginPath(); c.arc(q[0],q[1],rr,0,7); c.fillStyle='rgba(0,210,190,.10)'; c.fill(); c.strokeStyle='rgba(0,210,190,.35)'; c.lineWidth=1; c.stroke(); }
@@ -185,6 +185,52 @@ const angWrap=a=>{ while(a>Math.PI) a-=2*Math.PI; while(a<-Math.PI) a+=2*Math.PI
 /* ---- gravity well: particles ahead of you fall in along the route, slowly at first, then very fast ---- */
 const WELL=230;                                  // metres ahead where the pull starts (~2½ blocks)
 const PART={list:[],energy:0,spawn:0};
+const FX={kind:['well','surge','off'].includes(store.get('rnFx','well'))?store.get('rnFx','well'):'well'};
+/* ---- power surge: the line ahead crackles; sparks get smaller-scale wild the closer you are, arcs jump from you onto it ---- */
+const SURGE={list:[],spawn:0,arcT:0,arcs:[]};
+function drawSurge(c,prog,lw){
+  const dt=ANIM.frame?Math.min(0.06,ANIM.dt||0.033):0, mpp=156543.03*Math.cos(MAP.lat*Math.PI/180)/2**MAP.zf, live=!NAV.offOn&&!NAV.done, Z=WELL;
+  const you=screenOf(DISP.lat,DISP.lon), heat=d=>{ const k=1-Math.min(1,Math.max(0,d)/Z); return k*k; };   // 0 far out → 1 at you
+  const tan=s2=>{ const a=screenOf(...llAt(s2)), b=screenOf(...llAt(s2+2)), l=Math.hypot(b[0]-a[0],b[1]-a[1])||1; return [a,(b[0]-a[0])/l,(b[1]-a[1])/l]; };
+  c.save(); c.globalCompositeOperation='lighter'; c.lineCap='round';
+  // 1. the charged line: flickers harder near you
+  const z1=Math.min(R.total,prog+Z);
+  for(let a=prog;a<z1;a+=8){ const e=heat(a-prog), fl=dt?Math.random():0.6, p=screenOf(...llAt(a)), q=screenOf(...llAt(Math.min(z1,a+8.5)));
+    c.strokeStyle=`rgba(${Math.round(120+135*e*fl)},255,${Math.round(235+20*e)},${(0.18+0.55*e*(0.4+0.6*fl)).toFixed(3)})`; c.lineWidth=lw*(0.4+0.5*e*fl);
+    c.beginPath(); c.moveTo(p[0],p[1]); c.lineTo(q[0],q[1]); c.stroke(); }
+  // 2. sparks: born on the line, thrown off it; near you they're faster, shorter-lived and twitchier
+  // motion is in screen pixels so sparks read the same at any zoom
+  if(live&&dt){ SURGE.spawn+=dt*220; while(SURGE.spawn>=1&&SURGE.list.length<320){ SURGE.spawn--;
+      const d=Z*Math.pow(Math.random(),1.5), e=heat(d), ang=Math.random()*Math.PI*2, sp=(14+260*e)*(0.45+Math.random()*0.9);
+      SURGE.list.push({s:prog+d,ox:0,oy:0,vx:Math.cos(ang)*sp,vy:Math.sin(ang)*sp,life:0,max:(0.75-0.45*e)*(0.6+Math.random()*0.8),prev:null,hot:Math.random()}); } }
+  const keep=[];
+  for(const p of SURGE.list){
+    const d=p.s-prog; if(d<-3||d>Z+30){ continue; }
+    const e=heat(d); p.life+=dt; if(p.life>p.max) continue;
+    if(dt){ // eccentric: random kicks that grow with heat, a little drag
+      const kick=(30+1600*e*e)*dt; p.vx+=gauss()*kick; p.vy+=gauss()*kick;            // erratic, more so near you
+      if(e>0.55&&Math.random()<e*dt*14){ const sp=Math.hypot(p.vx,p.vy), an=Math.random()*Math.PI*2; p.vx=Math.cos(an)*sp; p.vy=Math.sin(an)*sp; }   // sudden zig
+      const dr=Math.exp(-dt*2.2); p.vx*=dr; p.vy*=dr; p.ox+=p.vx*dt; p.oy+=p.vy*dt; }
+    const [a]=tan(p.s), x=a[0]+p.ox, y=a[1]+p.oy, fade=1-p.life/p.max;
+    const w=(0.7+1.1*e)*Math.max(1,lw/8);
+    c.strokeStyle=p.hot<0.25&&e>0.4?`rgba(255,226,140,${(0.9*fade).toFixed(3)})`:`rgba(${Math.round(170+85*e)},255,${Math.round(240+15*e)},${(fade*(0.45+0.55*e)).toFixed(3)})`;
+    c.lineWidth=w; c.beginPath(); if(p.prev&&dt) c.moveTo(p.prev[0],p.prev[1]); else c.moveTo(x,y); c.lineTo(x+0.01,y); c.stroke();
+    if(dt) p.prev=[x,y]; keep.push(p); }
+  SURGE.list=keep;
+  // 3. arcs: jagged bolts from you onto the line ahead, and crawling along it; re-struck every ~70 ms
+  if(dt){ SURGE.arcT-=dt; if(SURGE.arcT<=0&&live){ SURGE.arcT=0.04+Math.random()*0.06; SURGE.arcs=[];
+      const n=2+Math.floor(Math.random()*3);
+      for(let i=0;i<n;i++){ const d0=i===0?0:Math.pow(Math.random(),1.5)*70, len=8+Math.random()*(i===0?28:22), pts=[];
+        for(let k=0;k<=8;k++){ const sk=prog+d0+len*k/8, j=(k===0||k===8)?0:gauss()*(3+11*heat(sk-prog)); pts.push([sk,j]); }
+        SURGE.arcs.push({pts,from:i===0,a:0.5+Math.random()*0.5}); } } }
+  for(const arc of SURGE.arcs){ c.beginPath();
+    arc.pts.forEach(([sk,j],k)=>{ const [a,tx,ty]=tan(Math.min(R.total,sk)); let x=a[0]-ty*j, y=a[1]+tx*j; if(arc.from&&k===0){ x=you[0]; y=you[1]; } k?c.lineTo(x,y):c.moveTo(x,y); });
+    c.save(); c.shadowColor='#00D2BE'; c.shadowBlur=10; c.strokeStyle=`rgba(225,255,252,${arc.a.toFixed(3)})`; c.lineWidth=1.3*Math.max(1,lw/8); c.stroke(); c.restore(); }
+  // 4. a crackle of light at you
+  const g=c.createRadialGradient(you[0],you[1],2,you[0],you[1],30+(dt?Math.random()*10:5));
+  g.addColorStop(0,'rgba(230,255,252,.55)'); g.addColorStop(0.4,'rgba(0,210,190,.25)'); g.addColorStop(1,'rgba(0,210,190,0)');
+  c.fillStyle=g; c.beginPath(); c.arc(you[0],you[1],40,0,7); c.fill();
+  c.restore(); }
 // speed (m/s) at distance d ahead: gentle far out, violent close in
 const pull=d=>3+14000/Math.pow(d+10,1.75);
 function drawWell(c,prog,lw){
@@ -271,7 +317,7 @@ function onFix(f){
   $('gpsWarn').hidden=f.acc<=40; if(f.acc>40) $('gpsWarn').textContent=`Weak GPS (±${Math.round(f.acc/FT)} ft)`;
   if(!NAV.on){ updateAway(); stepDisplay(1); draw(); return; }
   let m=null;
-  if(NAV.s!=null) m=project(x,y,NAV.s-40,NAV.s+500);
+  if(NAV.s!=null) m=project(x,y,NAV.s-40,NAV.s+500+Math.max(0,NAV.v)*3);
   else { m=project(x,y,-1,300); }          // first fix: prefer the start (a loop's finish is in the same place)
   // Jump further along only before the run has begun, or after being off route for a while (a deliberate shortcut).
   // Otherwise brushing past another part of the route would skip you ahead.
@@ -343,7 +389,7 @@ function begin(demo=false){
   $('startSheet').hidden=true; $('bar').hidden=false; $('fabs').hidden=false;
   // a gesture is needed before speech works on iPhones
   if('speechSynthesis' in window){ try{ const u=new SpeechSynthesisUtterance(' '); u.volume=0; speechSynthesis.speak(u); }catch(e){} }
-  keepAwake(); setFollow(true); MAP.zf=17; PART.list=[]; PART.energy=0; ANIM.last=0; animStart();
+  keepAwake(); setFollow(true); MAP.zf=17; PART.list=[]; PART.energy=0; SURGE.list=[]; SURGE.arcs=[]; ANIM.last=0; animStart();
   const c0=R.cues[0]; say(`Head ${COMPASS(R.startHead)}${c0.onto?' on '+speakName(c0.onto):''}.`);
   if(demo) runDemo(); else { startGps(); if(NAV.fix) onFix(NAV.fix); else update(); }
   store.set('rnActive',{key:currentKey(),t0:NAV.t0});
@@ -353,7 +399,8 @@ function end(){ NAV.on=false; $('simChip').hidden=true; DISP.s=DISP.lat=DISP.lon
 // simulated run: walks the route at ~9 min/mile pace, sped up, with a little GPS wobble
 // Simulated phone GPS: one fix a second (like a phone's GPS chip) at a steady ~9:00/mi pace times the preview speed,
 // with slowly wandering error (a few metres), reported accuracy, course and speed.
-const DEMO={t:null,s:0,mult:store.get('rnSimMult',4),last:0,ex:0,ey:0};
+const SIM_SPEEDS=[1,5,10,25];
+const DEMO={t:null,s:0,mult:SIM_SPEEDS.includes(store.get('rnSimMult',5))?store.get('rnSimMult',5):5,last:0,ex:0,ey:0};
 const gauss=()=>{ let u=0,v=0; while(!u) u=Math.random(); while(!v) v=Math.random(); return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v); };
 function demoTick(){ if(!NAV.on||!NAV.demo){ clearInterval(DEMO.t); return; }
   const now=performance.now(), pace=2.98*DEMO.mult; DEMO.s+=pace*(now-DEMO.last)/1000; DEMO.last=now;
@@ -364,7 +411,7 @@ function demoTick(){ if(!NAV.on||!NAV.demo){ clearInterval(DEMO.t); return; }
   if(DEMO.s>R.total+30) clearInterval(DEMO.t); }
 function runDemo(){ DEMO.s=0; DEMO.ex=DEMO.ey=0; DEMO.last=performance.now(); clearInterval(DEMO.t); simLabel(); demoTick(); DEMO.t=setInterval(demoTick,1000); }
 const simLabel=()=>{ $('simChip').textContent=`Preview · ${DEMO.mult}×`; $('simChip').setAttribute('aria-label',`Preview speed ${DEMO.mult} times running pace. Tap to change.`); };
-$('simChip').onclick=()=>{ const o=[1,4,12]; DEMO.mult=o[(o.indexOf(DEMO.mult)+1)%o.length]||4; store.set('rnSimMult',DEMO.mult); simLabel(); toast(DEMO.mult===1?'Preview at running pace (about 9 min/mi).':`Preview at ${DEMO.mult}× running pace.`); };
+$('simChip').onclick=()=>{ const o=SIM_SPEEDS; DEMO.mult=o[(o.indexOf(DEMO.mult)+1)%o.length]||5; store.set('rnSimMult',DEMO.mult); simLabel(); toast(DEMO.mult===1?'Preview at running pace (about 9 min/mi).':`Preview at ${DEMO.mult}× running pace.`); };
 
 /* ---------------- pocket mode ---------------- */
 function pocket(on){ $('pocket').hidden=!on; if(!on){ $('pocketBtn').focus(); animStart(); } if(on){ $('hold').focus(); keepAwake(); pocketUpdate(); toast('Pocket mode: voice cues on, screen locked. Hold the circle to unlock.'); } }
@@ -452,6 +499,7 @@ $('mMiles').onchange=e=>{ VOICE.miles=e.target.checked; store.set('rnMiles',VOIC
 const farLabel=()=>{ $('mFarV').textContent=`${VOICE.farFt.toLocaleString('en-US')} ft`; };
 $('mFar').value=VOICE.farFt; farLabel();
 $('mFar').addEventListener('input',e=>{ VOICE.farFt=+e.target.value; store.set('rnFarFt',VOICE.farFt); farLabel(); });
+$('mFx').value=FX.kind; $('mFx').onchange=e=>{ FX.kind=e.target.value; store.set('rnFx',FX.kind); PART.list=[]; SURGE.list=[]; SURGE.arcs=[]; drawOverlay(); };
 $('mThen').checked=VOICE.thenNext; $('mThen').onchange=e=>{ VOICE.thenNext=e.target.checked; store.set('rnThenNext',VOICE.thenNext); };
 $('mHaptic').checked=VOICE.haptic; $('mHaptic').onchange=e=>{ VOICE.haptic=e.target.checked; store.set('rnHaptic',VOICE.haptic); if(VOICE.haptic) buzz([260,110,260]); };
 if(!('vibrate' in navigator)){ $('mHaptic').disabled=true; $('mHapticNote').textContent='This phone doesn\'t let web pages vibrate (iPhones don\'t).'; }

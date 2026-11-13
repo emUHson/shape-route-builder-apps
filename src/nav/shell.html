@@ -89,6 +89,7 @@ button,a,label,input{touch-action:manipulation}
 .toggle input:checked::after{transform:translateX(20px);background:#000}
 .toggle input:disabled{opacity:.35}
 .hint:empty{display:none}
+.toggle select{background:#17191c;color:var(--ink);border:1px solid var(--gun);border-radius:2px;padding:8px 10px;font:600 13px var(--body);flex:none}
 .slider input[type=range]{width:100%;accent-color:var(--teal)}
 .val{font:600 14px var(--mono);color:var(--teal2);font-variant-numeric:tabular-nums}
 #preview{width:100%;height:150px;background:#0b0c0e;border:1px solid var(--graphite)}
@@ -187,6 +188,7 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
   <label class="toggle">Vibrate at turns<input type="checkbox" id="mHaptic" checked></label>
   <p class="hint" id="mHapticNote"></p>
   <label class="toggle">Heading up (map turns with you)<input type="checkbox" id="mHead"></label>
+  <label class="toggle" for="mFx">Route effect<select id="mFx"><option value="well">Gravity well</option><option value="surge">Power surge</option><option value="off">Off (saves battery)</option></select></label>
   <div class="row2"><button class="btn" id="mShare">Share route</button><button class="btn" id="mOther">Open in another app (GPX)</button></div>
   <div class="row2"><button class="btn" id="mRestart">Restart run</button><button class="btn" id="mEnd">End run</button></div>
   <button class="btn" id="mClose">Close</button>
