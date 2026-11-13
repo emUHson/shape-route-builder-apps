@@ -19,8 +19,8 @@ async function inflate(bytes){ const ds=new DecompressionStream('deflate-raw'); 
 async function deflate(bytes){ const cs=new CompressionStream('deflate-raw'); const r=new Response(new Blob([bytes]).stream().pipeThrough(cs)); return new Uint8Array(await r.arrayBuffer()); }
 async function routeFromHash(h){ const m=/[#&]r=([A-Za-z0-9_-]+)/.exec(h); if(!m) return null;
   const json=new TextDecoder().decode(await inflate(b64u.dec(m[1]))); const o=JSON.parse(json);
-  return {name:o.n||'Route',pts:decPoly(o.p),cues:(o.c||[]).map(c=>({i:c[0],k:c[1],onto:c[2]||'',where:c[3]||''})),loop:!!o.l,shape:o.s||''}; }
-async function hashFromRoute(R){ const o={v:1,n:R.name,p:encPoly(R.pts),c:R.cues.map(c=>[c.i,c.k,c.onto,c.where].map(v=>v===''?undefined:v)),l:R.loop?1:0};
+  return {name:o.n||'Route',pts:decPoly(o.p),cues:(o.c||[]).map(c=>({i:c[0],k:c[1],onto:c[2]||'',where:c[3]||'',b:+c[4]||0})),loop:!!o.l,shape:o.s||''}; }
+async function hashFromRoute(R){ const o={v:1,n:R.name,p:encPoly(R.pts),c:R.cues.map(c=>{ const a=[c.i,c.k,c.onto||'',c.where||'',c.b||0]; while(a.length>2&&!a[a.length-1]) a.pop(); return a; }),l:R.loop?1:0};
   if(R.shape) o.s=R.shape; return 'r='+b64u.enc(await deflate(new TextEncoder().encode(JSON.stringify(o)))); }
 
 /* ---------------- GPX ---------------- */
@@ -342,7 +342,7 @@ $('map').addEventListener('keydown',e=>{ const k=e.key, step=80;
 
 /* ---------------- voice ---------------- */
 const VOICE={on:store.get('rnVoice',true),miles:store.get('rnMiles',true),leadFt:clamp(store.get('rnLeadFt',50),0,100),pocketLvl:store.get('rnPocketLvl',1),thenNext:store.get('rnThenNext',false),haptic:store.get('rnHaptic',true),unlocked:false};
-function say(t,urgent=false){ if(!VOICE.on||!('speechSynthesis' in window)) return; try{ if(urgent) speechSynthesis.cancel(); const u=new SpeechSynthesisUtterance(t); u.rate=1.02; u.lang='en-US'; speechSynthesis.speak(u); }catch(e){} }
+function say(t,urgent=false){ if(!VOICE.on||!('speechSynthesis' in window)) return; try{ if(urgent) speechSynthesis.cancel(); const u=new SpeechSynthesisUtterance(t); u.rate=1.02; u.lang='en-US'; speechSynthesis.speak(u); return u; }catch(e){} }
 function buzz(p){ if(!VOICE.haptic) return; try{ navigator.vibrate&&navigator.vibrate(p); }catch(e){} }
 
 /* ---------------- navigation ---------------- */
@@ -402,9 +402,18 @@ function turnCall(){
   if(!NAV.on||NAV.offOn||NAV.done||NAV.s==null||!VOICE.on&&!VOICE.haptic) return;
   const sp=NAV.s+Math.max(0,Math.min(NAV.v*(performance.now()-NAV.fixT)/1000,NAV.v*1.6+3)), lead=VOICE.leadFt*FT;
   for(let i=1;i<R.cues.length;i++){ const c=R.cues[i]; if(c.k==='END') break; if(c.s<sp-15||NAV.said.get(i)) continue; if(c.s-sp>lead) break;
-    NAV.said.set(i,1); say(cap(spoken(c))+'.',true); buzz(c.k==='S'?90:[260,110,260,110,420]);
-    const after=R.cues[i+1]; if(VOICE.thenNext&&after) say(`Then ${spoken(after)}.`);
+    NAV.said.set(i,1); const u0=say(cap(spoken(c))+'.',true); buzz(c.k==='S'?90:[260,110,260,110,420]);
+    const after=R.cues[i+1]; if(VOICE.thenNext&&after) sayAfterPause(u0,nextTurnLine(c,after));
     break; } }
+// "Next turn, right, in 2 blocks." Blocks come from the builder (named cross streets on the stretch);
+// on paths, unnamed stretches or when there's no count it gives the distance instead.
+const DIRWORD={TR:'right',TL:'left',BR:'bear right',BL:'bear left',XR:'sharp right',XL:'sharp left',U:'U-turn',S:'straight on'};
+function nextTurnLine(c,after){ const gap=after.s-c.s, when=c.b>0?`in ${c.b} block${c.b>1?'s':''}`:`in ${sayDist(gap)}`;
+  if(after.k==='END') return `Then the finish, ${when}.`;
+  return `Next turn, ${DIRWORD[after.k]||'continue'}${after.k==='S'&&after.onto?' onto '+speakName(after.onto):''}, ${when}.`; }
+// speak `t` a short beat after utterance `u` finishes (with a timer fallback for browsers that don't report the end)
+function sayAfterPause(u,t){ if(!VOICE.on) return; let done=false; const go=()=>{ if(done||!NAV.on) return; done=true; say(t); };
+  if(u) u.onend=()=>setTimeout(go,900); setTimeout(go,4500); }
 function spoken(c){ if(c.k==='END') return R.loop?'you are back at the start':'you have arrived'; const t=(TXT[c.k]||'Continue').toLowerCase().replace('make a ','');
   return c.onto?`${t} onto ${speakName(c.onto)}`:t; }
 const speakName=n=>n.replace(/^NE /,'Northeast ').replace(/^NW /,'Northwest ').replace(/^SE /,'Southeast ').replace(/^SW /,'Southwest ').replace(/^N /,'North ').replace(/^S /,'South ').replace(/^E /,'East ').replace(/^W /,'West ')
@@ -417,7 +426,7 @@ function stats(){ const s=NAV.s??0, el=(NAV.t0?(Date.now()-NAV.t0)/1000:0)*(NAV.
   $('sPace').textContent=s>160?fmtTime(el/(s/MI)):'–'; }
 function followNow(){ if(MAP.follow&&DISP.lat!=null){ MAP.lat=DISP.lat; MAP.lon=DISP.lon; if(MAP.headUp&&DISP.head!=null) MAP.rot=-(Math.PI/2-DISP.head); else MAP.rot=0; } }
 function drawFollow(){ if(!ANIM.raf){ stepDisplay(1); followNow(); } draw(); }
-function setFollow(on){ MAP.follow=on; $('fFollow').hidden=on||!NAV.on; if(on){ if(MAP.zf<16.5) MAP.zf=17; drawFollow(); } }
+function setFollow(on){ MAP.follow=on; $('fFollow').setAttribute('aria-pressed',String(on)); $('fFollow').setAttribute('aria-label',on?'Following you. Pan the map, then tap to re-center.':'Re-center on my position'); if(on){ if(MAP.zf<16.5) MAP.zf=17; drawFollow(); } }
 setInterval(()=>{ if(NAV.on&&NAV.t0&&!NAV.done){ stats(); pocketUpdate(); } },1000);
 
 /* ---------------- GPS + screen wake ---------------- */
@@ -433,7 +442,7 @@ function updateAway(){ if(!NAV.fix||!R.ll.length) return; const [x,y]=toXY(NAV.f
 /* ---------------- start / stop ---------------- */
 function begin(demo=false){
   NAV.on=true; NAV.demo=demo; if(demo){ NAV.fix=null; NAV.head=null; NAV.lastXY=null; } NAV.s=null; NAV.v=0; DISP.s=DISP.lat=DISP.lon=DISP.head=null; $('simChip').hidden=!demo; NAV.said.clear(); NAV.mile=0; NAV.done=false; NAV.offOn=false; NAV.off=0; NAV.t0=Date.now();
-  $('startSheet').hidden=true; $('bar').hidden=false; $('fHead').hidden=false;
+  $('startSheet').hidden=true; $('bar').hidden=false; $('mapCtl').hidden=false;
   // a gesture is needed before speech works on iPhones
   if('speechSynthesis' in window){ try{ const u=new SpeechSynthesisUtterance(' '); u.volume=0; speechSynthesis.speak(u); }catch(e){} }
   keepAwake(); setFollow(true); MAP.zf=17; PART.list=[]; PART.energy=0; SURGE.list=[]; SURGE.arcs=[]; GRIND.list=[]; ANIM.last=0; animStart();
@@ -442,7 +451,7 @@ function begin(demo=false){
   store.set('rnActive',{key:currentKey(),t0:NAV.t0});
 }
 function end(){ NAV.on=false; $('simChip').hidden=true; DISP.s=DISP.lat=DISP.lon=DISP.head=null; if(NAV.demo){ NAV.demo=false; clearInterval(DEMO.t); if(NAV.realFix){ NAV.fix=NAV.realFix; NAV.head=null; NAV.lastXY=null; } } NAV.s=null; NAV.next=null; try{ wake&&wake.release(); }catch(e){} wake=null;
-  $('bar').hidden=$('fHead').hidden=$('fFollow').hidden=$('banner').hidden=$('then').hidden=true; $('pocket').hidden=true; $('startSheet').hidden=false; store.set('rnActive',null); fitRoute(); }
+  $('bar').hidden=$('mapCtl').hidden=$('banner').hidden=$('then').hidden=true; $('pocket').hidden=true; $('startSheet').hidden=false; store.set('rnActive',null); fitRoute(); }
 // simulated run: walks the route at ~9 min/mile pace, sped up, with a little GPS wobble
 // Simulated phone GPS: one fix a second (like a phone's GPS chip) at a steady ~9:00/mi pace times the preview speed,
 // with slowly wandering error (a few metres), reported accuracy, course and speed.
@@ -554,8 +563,8 @@ const fsEl=document.documentElement, fsOK=!!(fsEl.requestFullscreen||fsEl.webkit
 const isFull=()=>!!(document.fullscreenElement||document.webkitFullscreenElement);
 function goFull(){ if(!fsOK||isFull()) return; try{ const p=(fsEl.requestFullscreen||fsEl.webkitRequestFullscreen).call(fsEl,{navigationUI:'hide'}); p&&p.catch&&p.catch(()=>{}); }catch(e){} }
 function exitFull(){ try{ (document.exitFullscreen||document.webkitExitFullscreen).call(document); }catch(e){} }
-const fsUI=()=>{ $('fFull').textContent=isFull()?'Leave full screen':'Full screen'; document.documentElement.classList.toggle('fs',isFull()); vvInset(); };
-$('fFull').hidden=!fsOK; $('fFull').onclick=()=>{ closeMenu(); if(isFull()) exitFull(); else { fsAuto=true; goFull(); } };
+const fsUI=()=>{ $('fFull').textContent=isFull()?'Leave full screen':'Full screen'; $('fFullMap').setAttribute('aria-pressed',String(isFull())); $('fFullMap').setAttribute('aria-label',isFull()?'Leave full screen':'Full screen'); document.documentElement.classList.toggle('fs',isFull()); vvInset(); };
+$('fFull').hidden=$('fFullMap').hidden=!fsOK; $('fFullMap').onclick=()=>{ if(isFull()) exitFull(); else { fsAuto=true; goFull(); } }; $('fFull').onclick=()=>{ closeMenu(); if(isFull()) exitFull(); else { fsAuto=true; goFull(); } };
 let fsAuto=true;   // once you leave full screen yourself, taps stop putting it back
 const fsChange=()=>{ fsUI(); if(!isFull()) fsAuto=false; };
 document.addEventListener('fullscreenchange',fsChange); document.addEventListener('webkitfullscreenchange',fsChange);
