@@ -424,20 +424,22 @@ function drawSurge(c,prog,lw){
     c.beginPath(); c.moveTo(p[0],p[1]); c.lineTo(q[0],q[1]); c.stroke(); }
   // 2. sparks: born on the line, thrown off it; near you they're faster, shorter-lived and twitchier
   // motion is in screen pixels so sparks read the same at any zoom
-  if(live&&dt){ SURGE.spawn+=dt*120; while(SURGE.spawn>=1&&SURGE.list.length<200){ SURGE.spawn--;
-      const d=Z*Math.pow(Math.random(),1.5), e=heat(d), ang=Math.random()*Math.PI*2, sp=(14+260*e)*(0.45+Math.random()*0.9);
-      SURGE.list.push({s:prog+d,ox:0,oy:0,vx:Math.cos(ang)*sp,vy:Math.sin(ang)*sp,life:0,max:(0.75-0.45*e)*(0.6+Math.random()*0.8),prev:null,hot:Math.random()}); } }
+  if(live&&dt){ SURGE.spawn+=dt*240; while(SURGE.spawn>=1&&SURGE.list.length<300){ SURGE.spawn--;
+      const d=Z*Math.pow(Math.random(),1.15), e=heat(d), ang=Math.random()*Math.PI*2, sp=(8+110*e)*(0.45+Math.random()*0.9);
+      SURGE.list.push({s:prog+d,ox:0,oy:0,vx:Math.cos(ang)*sp,vy:Math.sin(ang)*sp,life:0,max:(0.8-0.4*e)*(0.6+Math.random()*0.8),prev:null,hot:Math.random()}); } }
   const keep=[];
   for(const p of SURGE.list){
     const d=p.s-prog; if(d<-3||d>Z+30){ continue; }
     const e=heat(d); p.life+=dt; if(p.life>p.max) continue;
     if(dt){ // eccentric: random kicks that grow with heat, a little drag
-      const kick=(30+1600*e*e)*dt; p.vx+=gauss()*kick; p.vy+=gauss()*kick;            // erratic, more so near you
-      if(e>0.55&&Math.random()<e*dt*14){ const sp=Math.hypot(p.vx,p.vy), an=Math.random()*Math.PI*2; p.vx=Math.cos(an)*sp; p.vy=Math.sin(an)*sp; }   // sudden zig
+      const kick=(20+700*e*e)*dt; p.vx+=gauss()*kick; p.vy+=gauss()*kick;            // erratic, more so near you
+      if(e>0.6&&Math.random()<e*dt*9){ const sp=Math.hypot(p.vx,p.vy), an=Math.random()*Math.PI*2; p.vx=Math.cos(an)*sp; p.vy=Math.sin(an)*sp; }   // sudden zig
       const dr=Math.exp(-dt*2.2); p.vx*=dr; p.vy*=dr; p.ox+=p.vx*dt; p.oy+=p.vy*dt; }
     const [a]=tan(p.s), x=a[0]+p.ox, y=a[1]+p.oy, fade=1-p.life/p.max;
-    const w=(0.7+1.1*e)*Math.max(1,lw/8);
-    c.strokeStyle=p.hot<0.25&&e>0.4?`rgba(255,226,140,${(0.9*fade).toFixed(3)})`:`rgba(${Math.round(170+85*e)},255,${Math.round(240+15*e)},${(fade*(0.45+0.55*e)).toFixed(3)})`;
+    const w=(0.9+0.9*e)*Math.max(1,lw/8);
+    const warm=Math.max(0,(e-0.55)/0.45)*(p.hot<0.6?1:0.3);                   // last ~third: sparks start to glow amber
+    const col=[Math.round(110+145*Math.min(1,e*1.6)), Math.round(255-30*warm), Math.round(235+20*Math.min(1,e*1.6)-135*warm)];
+    c.strokeStyle=`rgba(${col[0]},${col[1]},${col[2]},${(fade*(0.5+0.5*e)).toFixed(3)})`;
     c.lineWidth=w; c.beginPath(); if(p.prev&&dt) c.moveTo(p.prev[0],p.prev[1]); else c.moveTo(x,y); c.lineTo(x+0.01,y); c.stroke();
     if(dt) p.prev=[x,y]; keep.push(p); }
   SURGE.list=keep;
@@ -453,21 +455,21 @@ function drawSurge(c,prog,lw){
   // 4. grinder sparks: a dense spray where you meet the line. White-hot streaks fan back past you,
   //    slow down, curl slightly and cool through amber to dull orange before they die.
   if(live){ const [cp,tx,ty]=tan(Math.min(R.total,prog+4)), back=Math.atan2(-ty,-tx);
-    if(dt){ GRIND.spawn+=dt*(260+120*Math.random()); while(GRIND.spawn>=1&&GRIND.list.length<420){ GRIND.spawn--;
-        const ang=back+gauss()*0.75, sp=(140+300*Math.random())*Math.max(1,lw/8);
-        GRIND.list.push({x:cp[0]+gauss()*1.5,y:cp[1]+gauss()*1.5,vx:Math.cos(ang)*sp,vy:Math.sin(ang)*sp,life:0,max:0.18+Math.random()*0.42,curl:gauss()*2.2,px:null,py:null}); } }
+    if(dt){ GRIND.spawn+=dt*(150+50*Math.random()); while(GRIND.spawn>=1&&GRIND.list.length<240){ GRIND.spawn--;
+        const ang=back+(Math.random()<0.5?-1:1)*(0.32+Math.abs(gauss())*0.16), sp=(100+160*Math.random())*Math.max(1,lw/8);   // two narrow jets just off the trail
+        GRIND.list.push({x:cp[0]+gauss()*1,y:cp[1]+gauss()*1,vx:Math.cos(ang)*sp,vy:Math.sin(ang)*sp,life:0,max:0.12+Math.random()*0.24,curl:gauss()*1.2,px:null,py:null}); } }
     const g2=[];
     for(const p of GRIND.list){ p.life+=dt; if(p.life>p.max) continue; const k=p.life/p.max;
       if(dt){ p.px=p.x; p.py=p.y; const dr=Math.exp(-dt*3.2), ca=Math.cos(p.curl*dt), sa=Math.sin(p.curl*dt), vx=p.vx*ca-p.vy*sa, vy=p.vx*sa+p.vy*ca;
         p.vx=vx*dr; p.vy=vy*dr; p.x+=p.vx*dt; p.y+=p.vy*dt; }
       // colour by temperature: white → yellow → amber → dull orange
-      const col=k<0.2?[255,252,235]:k<0.45?[255,226,120]:k<0.75?[255,170,40]:[230,90,20], a=(1-k)*(k<0.2?1:0.85);
-      c.strokeStyle=`rgba(${col[0]},${col[1]},${col[2]},${a.toFixed(3)})`; c.lineWidth=(k<0.3?1.4:1)*Math.max(1,lw/9);
+      const col=k<0.2?[255,252,235]:k<0.45?[255,226,120]:k<0.75?[255,170,40]:[230,90,20], a=(1-k)*(k<0.2?0.85:0.7);
+      c.strokeStyle=`rgba(${col[0]},${col[1]},${col[2]},${a.toFixed(3)})`; c.lineWidth=(k<0.3?1.1:0.8)*Math.max(1,lw/9);
       c.beginPath(); if(p.px!=null){ const sx=p.x+(p.px-p.x)*2.2, sy=p.y+(p.py-p.y)*2.2; c.moveTo(sx,sy); } else c.moveTo(p.x,p.y); c.lineTo(p.x+0.01,p.y); c.stroke();
       g2.push(p); }
     GRIND.list=g2;
-    const hot=c.createRadialGradient(cp[0],cp[1],0,cp[0],cp[1],9+Math.random()*4); hot.addColorStop(0,'rgba(255,250,230,.95)'); hot.addColorStop(0.5,'rgba(255,190,60,.45)'); hot.addColorStop(1,'rgba(255,150,30,0)');
-    c.fillStyle=hot; c.beginPath(); c.arc(cp[0],cp[1],14,0,7); c.fill(); }
+    const hot=c.createRadialGradient(cp[0],cp[1],0,cp[0],cp[1],6+Math.random()*3); hot.addColorStop(0,'rgba(255,250,230,.8)'); hot.addColorStop(0.5,'rgba(255,190,60,.3)'); hot.addColorStop(1,'rgba(255,150,30,0)');
+    c.fillStyle=hot; c.beginPath(); c.arc(cp[0],cp[1],10,0,7); c.fill(); }
   else GRIND.list=[];
   // 5. a crackle of light at you
   const g=c.createRadialGradient(you[0],you[1],2,you[0],you[1],30+(dt?Math.random()*10:5));
