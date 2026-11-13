@@ -137,34 +137,23 @@ function drawOverlay(){
     path(0,R.total); c.save(); c.shadowColor='#00D2BE'; c.shadowBlur=14; c.strokeStyle='#00A19C'; c.lineWidth=lw+3; c.stroke(); c.restore();
     c.strokeStyle='#00D2BE'; c.lineWidth=lw; c.stroke();
   } else {
-    const SURGE=170;   // about two blocks ahead the line starts to wake up
-    // 1. the line still to trace: quiet and thin, a guide rather than a goal
-    path(Math.min(R.total,prog+SURGE),R.total); c.strokeStyle='rgba(0,161,156,.55)'; c.lineWidth=lw*0.45; c.stroke();
-    // 2. the approach: swells and brightens toward you, with pulses rushing in
-    const step=6, z1=Math.min(R.total,prog+SURGE);
-    for(let a=prog;a<z1;a+=step){ const b=Math.min(z1,a+step+0.5), k=1-(a-prog)/SURGE, e=k*k*(3-2*k);   // smoothstep: 1 at you, 0 two blocks out
-      const throb=calm?0:0.12*e*Math.sin(t*6-(a-prog)/14);
-      const p=screenOf(...llAt(a)), q=screenOf(...llAt(b));
-      c.beginPath(); c.moveTo(p[0],p[1]); c.lineTo(q[0],q[1]);
-      c.save(); c.shadowColor='#00D2BE'; c.shadowBlur=4+16*e; c.strokeStyle=`rgba(0,${Math.round(161+49*e)},${Math.round(156+34*e)},${(0.55+0.45*e).toFixed(3)})`;
-      c.lineWidth=lw*(0.45+0.85*e+throb); c.stroke(); c.restore(); }
-    if(!calm){ path(prog,z1); c.save(); c.setLineDash([lw*0.9,lw*3.2]); c.lineDashOffset=t*90; c.strokeStyle='rgba(230,255,252,.85)'; c.lineWidth=lw*0.38; c.stroke(); c.restore(); }
-    // 3. what you've run: bold, vibrant, alive
+    // ahead: a quiet guide line, a touch brighter inside the gravity well
+    path(prog,R.total); c.strokeStyle='rgba(0,161,156,.5)'; c.lineWidth=lw*0.45; c.stroke();
+    path(prog,Math.min(R.total,prog+WELL)); c.save(); c.shadowColor='#00D2BE'; c.shadowBlur=6; c.strokeStyle='rgba(0,210,190,.55)'; c.lineWidth=lw*0.55; c.stroke(); c.restore();
+    // behind: calm, thick, glowing; no motion
     if(prog>0){ path(0,prog);
-      const breathe=calm?0:Math.sin(t*2.4)*0.5+0.5;
-      c.save(); c.shadowColor='#00D2BE'; c.shadowBlur=18+10*breathe; c.strokeStyle='#00A19C'; c.lineWidth=lw*1.5+3; c.stroke(); c.restore();
-      c.strokeStyle='#00D2BE'; c.lineWidth=lw*1.25; c.stroke();
-      c.strokeStyle=`rgba(210,255,250,${(0.55+0.3*breathe).toFixed(3)})`; c.lineWidth=lw*0.42; c.stroke();
-      if(!calm){ c.save(); c.setLineDash([lw*0.6,lw*5]); c.lineDashOffset=-t*70; c.strokeStyle='#fff'; c.lineWidth=lw*0.55; c.shadowColor='#fff'; c.shadowBlur=8; c.stroke(); c.restore(); }
-    }
+      c.save(); c.shadowColor='#00D2BE'; c.shadowBlur=26; c.strokeStyle='rgba(0,161,156,.9)'; c.lineWidth=lw*1.9+4; c.stroke(); c.restore();
+      c.strokeStyle='#14E6D0'; c.lineWidth=lw*1.5; c.stroke();
+      c.strokeStyle='rgba(225,255,251,.85)'; c.lineWidth=lw*0.5; c.stroke(); }
   }
   // direction chevrons every ~150 m ahead
-  c.fillStyle=running?'rgba(0,210,190,.9)':'#000'; for(let s=prog+(running?200:60);s<R.total;s+=150){ const a=screenOf(...llAt(s)), b=screenOf(...llAt(s+5)); if(a[0]<-20||a[1]<-20||a[0]>MAP.W+20||a[1]>MAP.H+20) continue;
+  c.fillStyle=running?'rgba(0,210,190,.9)':'#000'; for(let s=prog+(running?WELL+40:60);s<R.total;s+=150){ const a=screenOf(...llAt(s)), b=screenOf(...llAt(s+5)); if(a[0]<-20||a[1]<-20||a[0]>MAP.W+20||a[1]>MAP.H+20) continue;
     const an=Math.atan2(b[1]-a[1],b[0]-a[0]); c.save(); c.translate(a[0],a[1]); c.rotate(an); c.beginPath(); c.moveTo(lw*0.55,0); c.lineTo(-lw*0.4,-lw*0.45); c.lineTo(-lw*0.15,0); c.lineTo(-lw*0.4,lw*0.45); c.closePath(); c.fill(); c.restore(); }
   // next cue marker
   const nc=NAV.next; if(nc&&nc.k!=='START'){ const q=screenOf(...R.ll[nc.i]); c.beginPath(); c.arc(q[0],q[1],lw*0.9,0,7); c.fillStyle='#fff'; c.fill(); c.lineWidth=2.5; c.strokeStyle='#000'; c.stroke(); }
   // start / finish
   const s0=P[0]; c.beginPath(); c.arc(s0[0],s0[1],9,0,7); c.fillStyle='#fff'; c.fill(); c.fillStyle='#000'; c.font='700 10px system-ui'; c.textAlign='center'; c.textBaseline='middle'; c.fillText('S',s0[0],s0[1]+0.5);
+  if(running&&!calm&&NAV.fix) drawWell(c,prog,lw);
   // you
   if(NAV.fix){ const q=screenOf(NAV.fix.lat,NAV.fix.lon), mpp=156543.03*Math.cos(NAV.fix.lat*Math.PI/180)/2**MAP.zf, rr=NAV.fix.acc/mpp;
     if(rr>12){ c.beginPath(); c.arc(q[0],q[1],rr,0,7); c.fillStyle='rgba(0,210,190,.10)'; c.fill(); c.strokeStyle='rgba(0,210,190,.35)'; c.lineWidth=1; c.stroke(); }
@@ -173,9 +162,43 @@ function drawOverlay(){
     else { c.beginPath(); c.arc(0,0,9,0,7); c.fillStyle='#fff'; c.fill(); c.lineWidth=3; c.strokeStyle='#00A19C'; c.stroke(); }
     c.restore(); }
 }
-const ANIM={t:0,raf:0,last:0,reduced:matchMedia('(prefers-reduced-motion: reduce)').matches};
+const ANIM={t:0,dt:0,raf:0,last:0,reduced:matchMedia('(prefers-reduced-motion: reduce)').matches};
+/* ---- gravity well: particles ahead of you fall in along the route, slowly at first, then very fast ---- */
+const WELL=230;                                  // metres ahead where the pull starts (~2½ blocks)
+const PART={list:[],energy:0,spawn:0};
+// speed (m/s) at distance d ahead: gentle far out, violent close in
+const pull=d=>3+14000/Math.pow(d+10,1.75);
+function drawWell(c,prog,lw){
+  const dt=ANIM.frame?Math.min(0.06,ANIM.dt||0.033):0, mpp=156543.03*Math.cos(MAP.lat*Math.PI/180)/2**MAP.zf, live=!NAV.offOn&&!NAV.done;
+  // spawn: denser further out so the well looks fed from the distance
+  if(live){ PART.spawn+=dt*55; while(PART.spawn>=1&&PART.list.length<160){ PART.spawn--; const d0=40+Math.pow(Math.random(),0.6)*(WELL-40);
+      PART.list.push({s:prog+d0,d0,off:(Math.random()<.5?-1:1)*(4+Math.random()*26),sz:0.6+Math.random()*1.2,hue:Math.random(),prev:null}); } }
+  const you=screenOf(NAV.fix.lat,NAV.fix.lon);
+  c.save(); c.globalCompositeOperation='lighter'; c.lineCap='round';
+  const keep=[];
+  for(const p of PART.list){
+    const d=p.s-prog; if(d>WELL+40||p.s>R.total){ continue; }
+    if(d<=2.5){ PART.energy=Math.min(1.6,PART.energy+0.035); continue; }   // swallowed
+    p.s-=pull(Math.max(0,d))*dt;
+    const dd=Math.max(0,p.s-prog), k=Math.min(1,dd/p.d0);                 // 1 when spawned → 0 at the runner
+    const a=screenOf(...llAt(p.s)), b=screenOf(...llAt(p.s+2)), tx=b[0]-a[0], ty=b[1]-a[1], tl=Math.hypot(tx,ty)||1;
+    let x=a[0]-ty/tl*p.off*Math.pow(k,0.7)/mpp, y=a[1]+tx/tl*p.off*Math.pow(k,0.7)/mpp;
+    // the last few metres bend straight into the arrow
+    if(dd<14){ const w=1-dd/14; x+= (you[0]-x)*w*w; y+=(you[1]-y)*w*w; }
+    const heat=1-k, alpha=0.25+0.75*heat, width=(p.sz*(1+2.2*heat))*Math.max(1,lw/7);
+    const col=p.hue<0.7?`rgba(${Math.round(80+175*heat)},255,${Math.round(230+25*heat)},${alpha.toFixed(3)})`:`rgba(255,255,255,${alpha.toFixed(3)})`;
+    c.strokeStyle=col; c.lineWidth=width;
+    c.beginPath(); if(p.prev&&dt){ c.moveTo(x+(p.prev[0]-x)*2.5,y+(p.prev[1]-y)*2.5); } else c.moveTo(x,y); c.lineTo(x+0.01,y); c.stroke();
+    if(dt) p.prev=[x,y]; keep.push(p); }
+  PART.list=keep;
+  // event horizon: a glow that swells as particles are swallowed, then settles
+  PART.energy*=Math.exp(-dt*1.8);
+  const e=Math.min(1.2,PART.energy), r0=16+10*e, g=c.createRadialGradient(you[0],you[1],2,you[0],you[1],r0*2.6);
+  g.addColorStop(0,`rgba(220,255,250,${(0.35+0.4*e).toFixed(3)})`); g.addColorStop(0.35,`rgba(0,210,190,${(0.22+0.3*e).toFixed(3)})`); g.addColorStop(1,'rgba(0,210,190,0)');
+  c.fillStyle=g; c.beginPath(); c.arc(you[0],you[1],r0*2.6,0,7); c.fill();
+  c.restore(); }
 function animLoop(ts){ ANIM.raf=0; if(!NAV.on||document.hidden||!$('pocket').hidden) return;
-  if(ts-ANIM.last>=33){ ANIM.last=ts; ANIM.t=ts/1000; drawOverlay(); } ANIM.raf=requestAnimationFrame(animLoop); }
+  if(ts-ANIM.last>=33){ ANIM.dt=ANIM.last?(ts-ANIM.last)/1000:0.033; ANIM.last=ts; ANIM.t=ts/1000; ANIM.frame=true; drawOverlay(); ANIM.frame=false; } ANIM.raf=requestAnimationFrame(animLoop); }
 function animStart(){ if(!ANIM.raf&&!ANIM.reduced) ANIM.raf=requestAnimationFrame(animLoop); }
 document.addEventListener('visibilitychange',()=>{ if(!document.hidden) animStart(); });
 function llAt(s){ const [x,y]=pointAt(s); return [PROJ.lat0+y/PROJ.ky, PROJ.lon0+x/PROJ.kx]; }
@@ -295,7 +318,7 @@ function begin(demo=false){
   $('startSheet').hidden=true; $('bar').hidden=false; $('fabs').hidden=false;
   // a gesture is needed before speech works on iPhones
   if('speechSynthesis' in window){ try{ const u=new SpeechSynthesisUtterance(' '); u.volume=0; speechSynthesis.speak(u); }catch(e){} }
-  keepAwake(); setFollow(true); MAP.zf=17; animStart();
+  keepAwake(); setFollow(true); MAP.zf=17; PART.list=[]; PART.energy=0; ANIM.last=0; animStart();
   const c0=R.cues[0]; say(`Head ${COMPASS(R.startHead)}${c0.onto?' on '+speakName(c0.onto):''}.`);
   if(demo) runDemo(); else { startGps(); if(NAV.fix) onFix(NAV.fix); else update(); }
   store.set('rnActive',{key:currentKey(),t0:NAV.t0});
