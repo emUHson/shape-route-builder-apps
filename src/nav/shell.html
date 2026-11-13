@@ -86,6 +86,10 @@ button,a,label,input{touch-action:manipulation}
 .toggle input::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;background:var(--silver);transition:transform .15s}
 .toggle input:checked{background:var(--teal)}
 .toggle input:checked::after{transform:translateX(20px);background:#000}
+.toggle input:disabled{opacity:.35}
+.hint:empty{display:none}
+.slider input[type=range]{width:100%;accent-color:var(--teal)}
+.val{font:600 14px var(--mono);color:var(--teal2);font-variant-numeric:tabular-nums}
 #preview{width:100%;height:150px;background:#0b0c0e;border:1px solid var(--graphite)}
 .scrim{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:19}
 
@@ -157,7 +161,7 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
   <p class="hint" id="rStart"></p>
   <button class="btn primary" id="goBtn">Start navigation</button>
   <button class="btn" id="cuesBtn2">See all turns</button>
-  <div class="row2"><a class="btn" id="dirBtn" target="_blank" rel="noopener">Directions to start</a><button class="btn" id="otherBtn">Open in another app</button></div>
+  <div class="row2"><a class="btn" id="dirBtn" target="_blank" rel="noopener">Directions to start</a><button class="btn" id="otherBtn">Open in another app (GPX)</button></div>
   <p class="hint">Keep this page open with the screen on: phones stop sharing GPS with web pages when locked. Use <b>pocket mode</b> for a dark, locked screen with voice cues. For a fully locked phone, <b>Open in another app</b> sends the route to a nav app such as OsmAnd (free).</p>
   <button class="btn" id="demoBtn">Preview the run (simulated)</button>
 </div>
@@ -174,8 +178,14 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
   <div class="eyebrow">Run</div>
   <label class="toggle">Voice cues<input type="checkbox" id="mVoice" checked></label>
   <label class="toggle">Mile updates<input type="checkbox" id="mMiles" checked></label>
+  <label class="toggle">Also say the turn after next<input type="checkbox" id="mThen"></label>
+  <div class="slider"><div class="toggle" style="margin-bottom:6px"><label for="mFar">First voice prompt</label><span class="val" id="mFarV"></span></div>
+    <input type="range" id="mFar" min="100" max="1000" step="50" aria-describedby="mFarHint">
+    <p class="hint" id="mFarHint">How far before each turn you hear "In … feet, turn …". A second prompt always comes at the turn.</p></div>
+  <label class="toggle">Vibrate at turns<input type="checkbox" id="mHaptic" checked></label>
+  <p class="hint" id="mHapticNote"></p>
   <label class="toggle">Heading up (map turns with you)<input type="checkbox" id="mHead"></label>
-  <div class="row2"><button class="btn" id="mShare">Share route</button><button class="btn" id="mOther">Open in another app</button></div>
+  <div class="row2"><button class="btn" id="mShare">Share route</button><button class="btn" id="mOther">Open in another app (GPX)</button></div>
   <div class="row2"><button class="btn" id="mRestart">Restart run</button><button class="btn" id="mEnd">End run</button></div>
   <button class="btn" id="mClose">Close</button>
 </div>

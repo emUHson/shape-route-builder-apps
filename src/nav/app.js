@@ -101,7 +101,7 @@ function arrowSvg(k){ const S='fill="none" stroke="currentColor" stroke-width="2
   else if(k==='OFF') body=`<circle cx="12" cy="12" r="9" ${S}/><path d="M12 7v6M12 16.5v.5" ${S}/>`;
   return `<svg viewBox="0 0 24 24" width="100%" height="100%">${body}</svg>`; }
 const fmtDist=m=>{ const f=m/FT; if(f<1000) return [String(Math.max(0,Math.round(f/10)*10)),'ft']; return [(m/MI).toFixed(m<16*MI?2:1),'mi']; };
-const sayDist=m=>{ const f=m/FT; if(f<1000) return `${Math.round(f/50)*50||50} feet`; const mi=m/MI; return mi<1.05&&mi>0.95?'1 mile':`${mi.toFixed(1)} miles`; };
+const sayDist=m=>{ const f=m/FT; if(f<1000) return `${Math.round(f/50)*50||50} feet`; if(f<2640) return `${(Math.round(f/100)*100).toLocaleString('en-US')} feet`; const mi=m/MI; return mi<1.05&&mi>0.95?'1 mile':`${mi.toFixed(1)} miles`; };
 const fmtTime=s=>{ s=Math.max(0,Math.round(s)); const h=Math.floor(s/3600), m=Math.floor(s%3600/60), x=s%60; return h?`${h}:${String(m).padStart(2,'0')}:${String(x).padStart(2,'0')}`:`${m}:${String(x).padStart(2,'0')}`; };
 
 /* ---------------- map: OSM raster tiles + canvas overlay ---------------- */
@@ -132,12 +132,34 @@ function drawOverlay(){
   const path=(from,to)=>{ c.beginPath(); let started=false; for(let i=0;i<P.length;i++){ if(R.cum[i]<from-1e-6&&i<P.length-1&&R.cum[i+1]<from) continue; if(R.cum[i]>to&&started){ const q=screenOf(...llAt(to)); c.lineTo(q[0],q[1]); break; }
       if(!started){ const q=R.cum[i]<from?screenOf(...llAt(from)):P[i]; c.moveTo(q[0],q[1]); started=true; if(R.cum[i]<from) continue; } c.lineTo(P[i][0],P[i][1]); } };
   c.lineCap='round'; c.lineJoin='round';
-  // run part dimmed, rest bright with a glow
-  if(NAV.s!=null&&prog>0){ path(0,prog); c.strokeStyle='rgba(192,194,197,.35)'; c.lineWidth=lw*0.7; c.stroke(); }
-  path(prog,R.total); c.save(); c.shadowColor='#00D2BE'; c.shadowBlur=14; c.strokeStyle='#00A19C'; c.lineWidth=lw+3; c.stroke(); c.restore();
-  c.strokeStyle='#00D2BE'; c.lineWidth=lw; c.stroke();
+  const running=NAV.on&&NAV.s!=null, t=ANIM.t, calm=ANIM.reduced;
+  if(!running){ // before the run: one clean bright line
+    path(0,R.total); c.save(); c.shadowColor='#00D2BE'; c.shadowBlur=14; c.strokeStyle='#00A19C'; c.lineWidth=lw+3; c.stroke(); c.restore();
+    c.strokeStyle='#00D2BE'; c.lineWidth=lw; c.stroke();
+  } else {
+    const SURGE=170;   // about two blocks ahead the line starts to wake up
+    // 1. the line still to trace: quiet and thin, a guide rather than a goal
+    path(Math.min(R.total,prog+SURGE),R.total); c.strokeStyle='rgba(0,161,156,.55)'; c.lineWidth=lw*0.45; c.stroke();
+    // 2. the approach: swells and brightens toward you, with pulses rushing in
+    const step=6, z1=Math.min(R.total,prog+SURGE);
+    for(let a=prog;a<z1;a+=step){ const b=Math.min(z1,a+step+0.5), k=1-(a-prog)/SURGE, e=k*k*(3-2*k);   // smoothstep: 1 at you, 0 two blocks out
+      const throb=calm?0:0.12*e*Math.sin(t*6-(a-prog)/14);
+      const p=screenOf(...llAt(a)), q=screenOf(...llAt(b));
+      c.beginPath(); c.moveTo(p[0],p[1]); c.lineTo(q[0],q[1]);
+      c.save(); c.shadowColor='#00D2BE'; c.shadowBlur=4+16*e; c.strokeStyle=`rgba(0,${Math.round(161+49*e)},${Math.round(156+34*e)},${(0.55+0.45*e).toFixed(3)})`;
+      c.lineWidth=lw*(0.45+0.85*e+throb); c.stroke(); c.restore(); }
+    if(!calm){ path(prog,z1); c.save(); c.setLineDash([lw*0.9,lw*3.2]); c.lineDashOffset=t*90; c.strokeStyle='rgba(230,255,252,.85)'; c.lineWidth=lw*0.38; c.stroke(); c.restore(); }
+    // 3. what you've run: bold, vibrant, alive
+    if(prog>0){ path(0,prog);
+      const breathe=calm?0:Math.sin(t*2.4)*0.5+0.5;
+      c.save(); c.shadowColor='#00D2BE'; c.shadowBlur=18+10*breathe; c.strokeStyle='#00A19C'; c.lineWidth=lw*1.5+3; c.stroke(); c.restore();
+      c.strokeStyle='#00D2BE'; c.lineWidth=lw*1.25; c.stroke();
+      c.strokeStyle=`rgba(210,255,250,${(0.55+0.3*breathe).toFixed(3)})`; c.lineWidth=lw*0.42; c.stroke();
+      if(!calm){ c.save(); c.setLineDash([lw*0.6,lw*5]); c.lineDashOffset=-t*70; c.strokeStyle='#fff'; c.lineWidth=lw*0.55; c.shadowColor='#fff'; c.shadowBlur=8; c.stroke(); c.restore(); }
+    }
+  }
   // direction chevrons every ~150 m ahead
-  c.fillStyle='#000'; for(let s=prog+60;s<R.total;s+=150){ const a=screenOf(...llAt(s)), b=screenOf(...llAt(s+5)); if(a[0]<-20||a[1]<-20||a[0]>MAP.W+20||a[1]>MAP.H+20) continue;
+  c.fillStyle=running?'rgba(0,210,190,.9)':'#000'; for(let s=prog+(running?200:60);s<R.total;s+=150){ const a=screenOf(...llAt(s)), b=screenOf(...llAt(s+5)); if(a[0]<-20||a[1]<-20||a[0]>MAP.W+20||a[1]>MAP.H+20) continue;
     const an=Math.atan2(b[1]-a[1],b[0]-a[0]); c.save(); c.translate(a[0],a[1]); c.rotate(an); c.beginPath(); c.moveTo(lw*0.55,0); c.lineTo(-lw*0.4,-lw*0.45); c.lineTo(-lw*0.15,0); c.lineTo(-lw*0.4,lw*0.45); c.closePath(); c.fill(); c.restore(); }
   // next cue marker
   const nc=NAV.next; if(nc&&nc.k!=='START'){ const q=screenOf(...R.ll[nc.i]); c.beginPath(); c.arc(q[0],q[1],lw*0.9,0,7); c.fillStyle='#fff'; c.fill(); c.lineWidth=2.5; c.strokeStyle='#000'; c.stroke(); }
@@ -151,6 +173,11 @@ function drawOverlay(){
     else { c.beginPath(); c.arc(0,0,9,0,7); c.fillStyle='#fff'; c.fill(); c.lineWidth=3; c.strokeStyle='#00A19C'; c.stroke(); }
     c.restore(); }
 }
+const ANIM={t:0,raf:0,last:0,reduced:matchMedia('(prefers-reduced-motion: reduce)').matches};
+function animLoop(ts){ ANIM.raf=0; if(!NAV.on||document.hidden||!$('pocket').hidden) return;
+  if(ts-ANIM.last>=33){ ANIM.last=ts; ANIM.t=ts/1000; drawOverlay(); } ANIM.raf=requestAnimationFrame(animLoop); }
+function animStart(){ if(!ANIM.raf&&!ANIM.reduced) ANIM.raf=requestAnimationFrame(animLoop); }
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden) animStart(); });
 function llAt(s){ const [x,y]=pointAt(s); return [PROJ.lat0+y/PROJ.ky, PROJ.lon0+x/PROJ.kx]; }
 function fitRoute(pad=60){ if(!R.ll.length) return; let a=1e9,b=-1e9,c=1e9,d=-1e9; for(const [la,lo] of R.ll){ a=Math.min(a,la); b=Math.max(b,la); c=Math.min(c,lo); d=Math.max(d,lo); }
   const top=NAV.on?170:pad, bottom=NAV.on?110:(innerHeight*0.55);
@@ -180,9 +207,9 @@ $('map').addEventListener('keydown',e=>{ const k=e.key, step=80;
   else return; e.preventDefault(); });
 
 /* ---------------- voice ---------------- */
-const VOICE={on:store.get('rnVoice',true),miles:store.get('rnMiles',true),unlocked:false};
+const VOICE={on:store.get('rnVoice',true),miles:store.get('rnMiles',true),farFt:store.get('rnFarFt',400),thenNext:store.get('rnThenNext',false),haptic:store.get('rnHaptic',true),unlocked:false};
 function say(t,urgent=false){ if(!VOICE.on||!('speechSynthesis' in window)) return; try{ if(urgent) speechSynthesis.cancel(); const u=new SpeechSynthesisUtterance(t); u.rate=1.02; u.lang='en-US'; speechSynthesis.speak(u); }catch(e){} }
-function buzz(p){ try{ navigator.vibrate&&navigator.vibrate(p); }catch(e){} }
+function buzz(p){ if(!VOICE.haptic) return; try{ navigator.vibrate&&navigator.vibrate(p); }catch(e){} }
 
 /* ---------------- navigation ---------------- */
 const NAV={on:false,demo:false,s:null,fix:null,head:null,next:null,off:0,offOn:false,t0:0,watch:null,said:new Map(),mile:0,lastXY:null,done:false,offAnnounced:0};
@@ -230,8 +257,11 @@ function update(){
   if(after&&!NAV.offOn&&!NAV.done&&after.s-nc.s<120){ $('then').hidden=false; $('thIc').innerHTML=arrowSvg(after.k); $('thTxt').textContent=cueShort(after); } else $('then').hidden=true;
   // voice: early warning and at the turn
   if(!NAV.offOn&&!NAV.done&&nc.k!=='START'){ const key=R.cues.indexOf(nc), st=NAV.said.get(key)||0;
-    if(st<1&&dist<=130&&dist>45){ NAV.said.set(key,1); say(`In ${sayDist(dist)}, ${spoken(nc)}.`); }
-    else if(st<2&&dist<=22){ NAV.said.set(key,2); say(cap(spoken(nc))+(after&&after.s-nc.s<80?`, then ${spoken(after)}`:'')+'.'); buzz(nc.k==='S'?60:[80,60,80]); } }
+    const far=VOICE.farFt*FT, gap=after?after.s-nc.s:0;
+    // "then…": always for turns that come quickly; for every turn when the option is on
+    const then=after&&after.k!=='START'&&(gap<80||VOICE.thenNext)?(gap<80?`, then ${spoken(after)}`:`, then in ${sayDist(gap)}, ${spoken(after)}`):'';
+    if(st<1&&dist<=far&&dist>36){ NAV.said.set(key,1); say(`In ${sayDist(dist)}, ${spoken(nc)}${VOICE.thenNext?then:''}.`); buzz(nc.k==='S'?0:120); }
+    else if(st<2&&dist<=22){ NAV.said.set(key,2); say(cap(spoken(nc))+then+'.'); buzz(nc.k==='S'?90:[260,110,260,110,420]); } }
   // mile markers
   const mile=Math.floor(s/MI); if(VOICE.miles&&mile>NAV.mile&&!NAV.done){ NAV.mile=mile; const el=(Date.now()-NAV.t0)/1000; say(`Mile ${mile}. ${spokenTime(el/mile)} per mile. ${((R.total-s)/MI).toFixed(1)} to go.`); }
   stats(); drawFollow(); pocketUpdate(); }
@@ -265,7 +295,7 @@ function begin(demo=false){
   $('startSheet').hidden=true; $('bar').hidden=false; $('fabs').hidden=false;
   // a gesture is needed before speech works on iPhones
   if('speechSynthesis' in window){ try{ const u=new SpeechSynthesisUtterance(' '); u.volume=0; speechSynthesis.speak(u); }catch(e){} }
-  keepAwake(); setFollow(true); MAP.zf=17;
+  keepAwake(); setFollow(true); MAP.zf=17; animStart();
   const c0=R.cues[0]; say(`Head ${COMPASS(R.startHead)}${c0.onto?' on '+speakName(c0.onto):''}.`);
   if(demo) runDemo(); else { startGps(); if(NAV.fix) onFix(NAV.fix); else update(); }
   store.set('rnActive',{key:currentKey(),t0:NAV.t0});
@@ -280,7 +310,7 @@ function runDemo(){ DEMO.s=0; clearInterval(DEMO.t); const speed=2.98*12; // met
     if(DEMO.s>R.total+30){ clearInterval(DEMO.t); } },500); }
 
 /* ---------------- pocket mode ---------------- */
-function pocket(on){ $('pocket').hidden=!on; if(!on) $('pocketBtn').focus(); if(on){ $('hold').focus(); keepAwake(); pocketUpdate(); toast('Pocket mode: voice cues on, screen locked. Hold the circle to unlock.'); } }
+function pocket(on){ $('pocket').hidden=!on; if(!on){ $('pocketBtn').focus(); animStart(); } if(on){ $('hold').focus(); keepAwake(); pocketUpdate(); toast('Pocket mode: voice cues on, screen locked. Hold the circle to unlock.'); } }
 function pocketUpdate(){ if($('pocket').hidden) return; const nc=NAV.next; if(!nc) return; $('pIc').innerHTML=arrowSvg(NAV.offOn?'OFF':nc.k); const [d,u]=NAV.offOn?['Off','route']:fmtDist(Math.max(0,nc.s-(NAV.s??0)));
   $('pDist').textContent=`${d} ${u}`; $('pTxt').textContent=NAV.offOn?'Head back to the route':cueText(nc); $('pStat').textContent=`${$('sDone').textContent} / ${(R.total/MI).toFixed(2)} mi · ${$('sTime').textContent}`; }
 (()=>{ const h=$('hold'); let t=null; const stop=()=>{ h.classList.remove('on'); clearTimeout(t); };
@@ -362,6 +392,12 @@ $('fHead').onclick=()=>setHead(!MAP.headUp); $('mHead').onchange=e=>setHead(e.ta
 const setVoice=on=>{ VOICE.on=on; store.set('rnVoice',on); $('fVoice').setAttribute('aria-pressed',String(on)); $('mVoice').checked=on; if(!on) try{ speechSynthesis.cancel(); }catch(e){} };
 $('fVoice').onclick=()=>{ setVoice(!VOICE.on); toast(VOICE.on?'Voice cues on.':'Voice cues off.'); }; $('mVoice').onchange=e=>setVoice(e.target.checked);
 $('mMiles').onchange=e=>{ VOICE.miles=e.target.checked; store.set('rnMiles',VOICE.miles); }; $('mMiles').checked=VOICE.miles;
+const farLabel=()=>{ $('mFarV').textContent=`${VOICE.farFt.toLocaleString('en-US')} ft`; };
+$('mFar').value=VOICE.farFt; farLabel();
+$('mFar').addEventListener('input',e=>{ VOICE.farFt=+e.target.value; store.set('rnFarFt',VOICE.farFt); farLabel(); });
+$('mThen').checked=VOICE.thenNext; $('mThen').onchange=e=>{ VOICE.thenNext=e.target.checked; store.set('rnThenNext',VOICE.thenNext); };
+$('mHaptic').checked=VOICE.haptic; $('mHaptic').onchange=e=>{ VOICE.haptic=e.target.checked; store.set('rnHaptic',VOICE.haptic); if(VOICE.haptic) buzz([260,110,260]); };
+if(!('vibrate' in navigator)){ $('mHaptic').disabled=true; $('mHapticNote').textContent='This phone doesn\'t let web pages vibrate (iPhones don\'t).'; }
 const closeMenu=()=>{ $('menuSheet').hidden=$('scrim').hidden=true; $('menuBtn').focus(); };
 $('menuBtn').onclick=()=>{ $('menuSheet').hidden=$('scrim').hidden=false; $('mVoice').focus(); }; $('mClose').onclick=closeMenu; $('scrim').onclick=()=>{ closeMenu(); closeCues(); };
 $('mEnd').onclick=()=>{ if(NAV.s>50&&!NAV.done&&!confirm('End this run? Your progress will be cleared.')) return; closeMenu(); end(); };
