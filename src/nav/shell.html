@@ -61,6 +61,7 @@ button,a,label,input{touch-action:manipulation}
 #fabs button{width:46px;height:46px;background:rgba(0,0,0,.88);border:1px solid var(--graphite);display:grid;place-items:center;border-radius:2px}
 #fabs button[aria-pressed="true"]{border-color:var(--teal);color:var(--teal2)}
 #fabs svg{width:20px;height:20px}
+#simChip{position:fixed;left:10px;bottom:calc(var(--sab) + 84px);z-index:6;background:rgba(0,0,0,.9);border:1px solid var(--teal);color:var(--teal2);font:600 12px var(--mono);padding:8px 12px;border-radius:2px;letter-spacing:.04em}
 #gpsWarn{position:fixed;left:10px;bottom:calc(var(--sab) + 84px);z-index:5;background:rgba(0,0,0,.9);border:1px solid var(--graphite);padding:6px 10px;font-size:12.5px;color:var(--amber);max-width:60vw}
 
 /* sheets (start, menu) */
@@ -139,6 +140,7 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
   <button id="fVoice" aria-pressed="true" aria-label="Voice cues" title="Voice"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16 9a4 4 0 010 6M18.5 6.5a8 8 0 010 11"/></svg></button>
 </div>
 <div id="gpsWarn" hidden role="status" aria-live="polite"></div>
+<button id="simChip" type="button" hidden></button>
 
 <div id="bar" hidden>
   <div class="st lead"><div class="k">Done</div><div class="v" id="sDone">0.00</div></div>

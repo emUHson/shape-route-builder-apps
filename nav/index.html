@@ -61,6 +61,7 @@ button,a,label,input{touch-action:manipulation}
 #fabs button{width:46px;height:46px;background:rgba(0,0,0,.88);border:1px solid var(--graphite);display:grid;place-items:center;border-radius:2px}
 #fabs button[aria-pressed="true"]{border-color:var(--teal);color:var(--teal2)}
 #fabs svg{width:20px;height:20px}
+#simChip{position:fixed;left:10px;bottom:calc(var(--sab) + 84px);z-index:6;background:rgba(0,0,0,.9);border:1px solid var(--teal);color:var(--teal2);font:600 12px var(--mono);padding:8px 12px;border-radius:2px;letter-spacing:.04em}
 #gpsWarn{position:fixed;left:10px;bottom:calc(var(--sab) + 84px);z-index:5;background:rgba(0,0,0,.9);border:1px solid var(--graphite);padding:6px 10px;font-size:12.5px;color:var(--amber);max-width:60vw}
 
 /* sheets (start, menu) */
@@ -139,6 +140,7 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
   <button id="fVoice" aria-pressed="true" aria-label="Voice cues" title="Voice"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16 9a4 4 0 010 6M18.5 6.5a8 8 0 010 11"/></svg></button>
 </div>
 <div id="gpsWarn" hidden role="status" aria-live="polite"></div>
+<button id="simChip" type="button" hidden></button>
 
 <div id="bar" hidden>
   <div class="st lead"><div class="k">Done</div><div class="v" id="sDone">0.00</div></div>
@@ -348,7 +350,7 @@ function drawTiles(){
 function drawOverlay(){
   const c=octx, d=MAP.dpr; c.setTransform(d,0,0,d,0,0); c.clearRect(0,0,MAP.W,MAP.H);
   if(!R.ll.length) return;
-  const P=R.ll.map(p=>screenOf(p[0],p[1])), prog=NAV.s??0, lw=clamp(2**(MAP.zf-16)*7,4,11);
+  const P=R.ll.map(p=>screenOf(p[0],p[1])), prog=DISP.s??NAV.s??0, lw=clamp(2**(MAP.zf-16)*7,4,11);
   const path=(from,to)=>{ c.beginPath(); let started=false; for(let i=0;i<P.length;i++){ if(R.cum[i]<from-1e-6&&i<P.length-1&&R.cum[i+1]<from) continue; if(R.cum[i]>to&&started){ const q=screenOf(...llAt(to)); c.lineTo(q[0],q[1]); break; }
       if(!started){ const q=R.cum[i]<from?screenOf(...llAt(from)):P[i]; c.moveTo(q[0],q[1]); started=true; if(R.cum[i]<from) continue; } c.lineTo(P[i][0],P[i][1]); } };
   c.lineCap='round'; c.lineJoin='round';
@@ -373,16 +375,35 @@ function drawOverlay(){
   const nc=NAV.next; if(nc&&nc.k!=='START'){ const q=screenOf(...R.ll[nc.i]); c.beginPath(); c.arc(q[0],q[1],lw*0.9,0,7); c.fillStyle='#fff'; c.fill(); c.lineWidth=2.5; c.strokeStyle='#000'; c.stroke(); }
   // start / finish
   const s0=P[0]; c.beginPath(); c.arc(s0[0],s0[1],9,0,7); c.fillStyle='#fff'; c.fill(); c.fillStyle='#000'; c.font='700 10px system-ui'; c.textAlign='center'; c.textBaseline='middle'; c.fillText('S',s0[0],s0[1]+0.5);
-  if(running&&!calm&&NAV.fix) drawWell(c,prog,lw);
+  if(running&&!calm&&DISP.lat!=null) drawWell(c,prog,lw);
   // you
-  if(NAV.fix){ const q=screenOf(NAV.fix.lat,NAV.fix.lon), mpp=156543.03*Math.cos(NAV.fix.lat*Math.PI/180)/2**MAP.zf, rr=NAV.fix.acc/mpp;
+  if(NAV.fix&&DISP.lat!=null){ const q=screenOf(DISP.lat,DISP.lon), mpp=156543.03*Math.cos(DISP.lat*Math.PI/180)/2**MAP.zf, rr=(DISP.s!=null?0:NAV.fix.acc)/mpp;
     if(rr>12){ c.beginPath(); c.arc(q[0],q[1],rr,0,7); c.fillStyle='rgba(0,210,190,.10)'; c.fill(); c.strokeStyle='rgba(0,210,190,.35)'; c.lineWidth=1; c.stroke(); }
     c.save(); c.translate(q[0],q[1]);
-    if(NAV.head!=null){ c.rotate(MAP.rot+(Math.PI/2-NAV.head)); c.beginPath(); c.moveTo(0,-16); c.lineTo(11,11); c.lineTo(0,5); c.lineTo(-11,11); c.closePath(); c.fillStyle='#fff'; c.shadowColor='#000'; c.shadowBlur=8; c.fill(); c.shadowBlur=0; c.strokeStyle='#000'; c.lineWidth=2; c.stroke(); }
+    if(DISP.head!=null){ c.rotate(MAP.rot+(Math.PI/2-DISP.head)); c.beginPath(); c.moveTo(0,-16); c.lineTo(11,11); c.lineTo(0,5); c.lineTo(-11,11); c.closePath(); c.fillStyle='#fff'; c.shadowColor='#000'; c.shadowBlur=8; c.fill(); c.shadowBlur=0; c.strokeStyle='#000'; c.lineWidth=2; c.stroke(); }
     else { c.beginPath(); c.arc(0,0,9,0,7); c.fillStyle='#fff'; c.fill(); c.lineWidth=3; c.strokeStyle='#00A19C'; c.stroke(); }
     c.restore(); }
 }
 const ANIM={t:0,dt:0,raf:0,last:0,reduced:matchMedia('(prefers-reduced-motion: reduce)').matches};
+/* What's drawn: on the route, the arrow glides along it at your measured speed and eases onto each new fix
+   (like car nav apps); off the route it eases toward the raw GPS position. */
+const DISP={lat:null,lon:null,head:null,s:null};
+function stepDisplay(dt){
+  const f=NAV.fix; if(!f) return;
+  if(NAV.on&&NAV.s!=null&&!NAV.offOn){
+    const ahead=Math.min(NAV.v*(performance.now()-NAV.fixT)/1000, NAV.v*1.6+3);   // dead-reckon, but never run far past the last fix
+    const target=Math.min(R.total,NAV.s+ahead);
+    if(DISP.s==null||Math.abs(target-DISP.s)>120) DISP.s=target;               // first fix or a jump: snap
+    else DISP.s+=(target-DISP.s)*Math.min(1,dt*3.5);
+    const [la,lo]=llAt(DISP.s); DISP.lat=la; DISP.lon=lo;
+    const want=headAlong(Math.max(0,DISP.s-4));
+    DISP.head=DISP.head==null?want:DISP.head+angWrap(want-DISP.head)*Math.min(1,dt*6);
+  } else {
+    DISP.s=null; const k=Math.min(1,dt*4);
+    DISP.lat=DISP.lat==null?f.lat:DISP.lat+(f.lat-DISP.lat)*k; DISP.lon=DISP.lon==null?f.lon:DISP.lon+(f.lon-DISP.lon)*k;
+    if(NAV.head!=null) DISP.head=DISP.head==null?NAV.head:DISP.head+angWrap(NAV.head-DISP.head)*Math.min(1,dt*5);
+  } }
+const angWrap=a=>{ while(a>Math.PI) a-=2*Math.PI; while(a<-Math.PI) a+=2*Math.PI; return a; };
 /* ---- gravity well: particles ahead of you fall in along the route, slowly at first, then very fast ---- */
 const WELL=230;                                  // metres ahead where the pull starts (~2½ blocks)
 const PART={list:[],energy:0,spawn:0};
@@ -393,7 +414,7 @@ function drawWell(c,prog,lw){
   // spawn: denser further out so the well looks fed from the distance
   if(live){ PART.spawn+=dt*55; while(PART.spawn>=1&&PART.list.length<160){ PART.spawn--; const d0=40+Math.pow(Math.random(),0.6)*(WELL-40);
       PART.list.push({s:prog+d0,d0,off:(Math.random()<.5?-1:1)*(4+Math.random()*26),sz:0.6+Math.random()*1.2,hue:Math.random(),prev:null}); } }
-  const you=screenOf(NAV.fix.lat,NAV.fix.lon);
+  const you=screenOf(DISP.lat,DISP.lon);
   c.save(); c.globalCompositeOperation='lighter'; c.lineCap='round';
   const keep=[];
   for(const p of PART.list){
@@ -418,8 +439,10 @@ function drawWell(c,prog,lw){
   c.fillStyle=g; c.beginPath(); c.arc(you[0],you[1],r0*2.6,0,7); c.fill();
   c.restore(); }
 function animLoop(ts){ ANIM.raf=0; if(!NAV.on||document.hidden||!$('pocket').hidden) return;
-  if(ts-ANIM.last>=33){ ANIM.dt=ANIM.last?(ts-ANIM.last)/1000:0.033; ANIM.last=ts; ANIM.t=ts/1000; ANIM.frame=true; drawOverlay(); ANIM.frame=false; } ANIM.raf=requestAnimationFrame(animLoop); }
-function animStart(){ if(!ANIM.raf&&!ANIM.reduced) ANIM.raf=requestAnimationFrame(animLoop); }
+  if(ts-ANIM.last>=33){ ANIM.dt=ANIM.last?Math.min(0.25,(ts-ANIM.last)/1000):0.033; ANIM.last=ts; ANIM.t=ts/1000; ANIM.frame=true;
+    stepDisplay(ANIM.dt); followNow(); if(MAP.follow) draw(); else drawOverlay(); ANIM.frame=false; }
+  ANIM.raf=requestAnimationFrame(animLoop); }
+function animStart(){ if(!ANIM.raf) ANIM.raf=requestAnimationFrame(animLoop); }
 document.addEventListener('visibilitychange',()=>{ if(!document.hidden) animStart(); });
 function llAt(s){ const [x,y]=pointAt(s); return [PROJ.lat0+y/PROJ.ky, PROJ.lon0+x/PROJ.kx]; }
 function fitRoute(pad=60){ if(!R.ll.length) return; let a=1e9,b=-1e9,c=1e9,d=-1e9; for(const [la,lo] of R.ll){ a=Math.min(a,la); b=Math.max(b,la); c=Math.min(c,lo); d=Math.max(d,lo); }
@@ -455,20 +478,20 @@ function say(t,urgent=false){ if(!VOICE.on||!('speechSynthesis' in window)) retu
 function buzz(p){ if(!VOICE.haptic) return; try{ navigator.vibrate&&navigator.vibrate(p); }catch(e){} }
 
 /* ---------------- navigation ---------------- */
-const NAV={on:false,demo:false,s:null,fix:null,head:null,next:null,off:0,offOn:false,t0:0,watch:null,said:new Map(),mile:0,lastXY:null,done:false,offAnnounced:0};
+const NAV={v:0,fixT:0,on:false,demo:false,s:null,fix:null,head:null,next:null,off:0,offOn:false,t0:0,watch:null,said:new Map(),mile:0,lastXY:null,done:false,offAnnounced:0};
 // where on the route am I? Look near my last progress first (routes can cross or retrace themselves), else anywhere.
 function project(x,y,from,to){ let best=null; for(let i=0;i<R.xy.length-1;i++){ if(R.cum[i+1]<from||R.cum[i]>to) continue;
     const [ax,ay]=R.xy[i],[bx,by]=R.xy[i+1], L2=(bx-ax)**2+(by-ay)**2||1e-9, t=clamp(((x-ax)*(bx-ax)+(y-ay)*(by-ay))/L2,0,1), px=ax+(bx-ax)*t, py=ay+(by-ay)*t, d=Math.hypot(x-px,y-py);
     if(!best||d<best.d-0.5) best={d,s:R.cum[i]+t*Math.sqrt(L2)}; }
   return best; }
 function onFix(f){
-  NAV.fix=f; const [x,y]=toXY(f.lat,f.lon), tol=Math.max(30,Math.min(60,f.acc*1.3));
+  const prevS=NAV.s, prevT=NAV.fixT; NAV.fix=f; NAV.fixT=performance.now(); const [x,y]=toXY(f.lat,f.lon), tol=Math.max(30,Math.min(60,f.acc*1.3));
   // heading: GPS course when moving, else from my last few metres of movement
   if(f.heading!=null&&!isNaN(f.heading)&&(f.speed||0)>0.8) NAV.head=Math.PI/2-f.heading*Math.PI/180;
   else if(NAV.lastXY&&Math.hypot(x-NAV.lastXY[0],y-NAV.lastXY[1])>6){ NAV.head=Math.atan2(y-NAV.lastXY[1],x-NAV.lastXY[0]); }
   if(!NAV.lastXY||Math.hypot(x-NAV.lastXY[0],y-NAV.lastXY[1])>6) NAV.lastXY=[x,y];
   $('gpsWarn').hidden=f.acc<=40; if(f.acc>40) $('gpsWarn').textContent=`Weak GPS (±${Math.round(f.acc/FT)} ft)`;
-  if(!NAV.on){ updateAway(); draw(); return; }
+  if(!NAV.on){ updateAway(); stepDisplay(1); draw(); return; }
   let m=null;
   if(NAV.s!=null) m=project(x,y,NAV.s-40,NAV.s+500);
   else { m=project(x,y,-1,300); }          // first fix: prefer the start (a loop's finish is in the same place)
@@ -480,6 +503,9 @@ function onFix(f){
     if(NAV.offOn){ NAV.offOn=false; say('Back on route.',true); }
     NAV.off=0;
   } else { NAV.off++; if(NAV.off>=2&&!NAV.offOn&&NAV.s!=null){ NAV.offOn=true; buzz([200,100,200]); say('Off route.',true); } }
+  // running speed for smooth display: GPS speed when reported, else from progress between fixes
+  if(f.speed!=null&&!isNaN(f.speed)&&f.speed>=0) NAV.v=NAV.v*0.5+f.speed*0.5;
+  else if(prevS!=null&&NAV.s!=null&&prevT){ const dtf=(NAV.fixT-prevT)/1000; if(dtf>0.2) NAV.v=NAV.v*0.6+clamp((NAV.s-prevS)/dtf,0,12)*0.4; }
   update(); }
 function nearestOnRoute(x,y){ return project(x,y,-1,1e9); }
 function update(){
@@ -489,7 +515,7 @@ function update(){
     $('then').hidden=true; drawFollow(); return; }
   const s=NAV.s;
   // finished?
-  if(!NAV.done&&s>=R.total-25){ NAV.done=true; say(`You've finished. ${(R.total/MI).toFixed(1)} miles in ${spokenTime((Date.now()-NAV.t0)/1000)}.`,true); buzz([300,150,300,150,300]); }
+  if(!NAV.done&&s>=R.total-25){ NAV.done=true; say(`You've finished. ${(R.total/MI).toFixed(1)} miles in ${spokenTime((Date.now()-NAV.t0)/1000*(NAV.demo?DEMO.mult:1))}.`,true); buzz([300,150,300,150,300]); }
   const i=R.cues.findIndex(c=>c.s>s+6); const nc=i<0?R.cues[R.cues.length-1]:R.cues[i]; NAV.next=nc;
   const dist=Math.max(0,nc.s-s);
   if(NAV.offOn){ const g=nearestOnRoute(...toXY(NAV.fix.lat,NAV.fix.lon)); showBanner('OFF',fmtDist(g?g.d:0),'Off route','Head back to the bright line',true); }
@@ -506,7 +532,7 @@ function update(){
     if(st<1&&dist<=far&&dist>36){ NAV.said.set(key,1); say(`In ${sayDist(dist)}, ${spoken(nc)}${VOICE.thenNext?then:''}.`); buzz(nc.k==='S'?0:120); }
     else if(st<2&&dist<=22){ NAV.said.set(key,2); say(cap(spoken(nc))+then+'.'); buzz(nc.k==='S'?90:[260,110,260,110,420]); } }
   // mile markers
-  const mile=Math.floor(s/MI); if(VOICE.miles&&mile>NAV.mile&&!NAV.done){ NAV.mile=mile; const el=(Date.now()-NAV.t0)/1000; say(`Mile ${mile}. ${spokenTime(el/mile)} per mile. ${((R.total-s)/MI).toFixed(1)} to go.`); }
+  const mile=Math.floor(s/MI); if(VOICE.miles&&mile>NAV.mile&&!NAV.done){ NAV.mile=mile; const el=(Date.now()-NAV.t0)/1000*(NAV.demo?DEMO.mult:1); say(`Mile ${mile}. ${spokenTime(el/mile)} per mile. ${((R.total-s)/MI).toFixed(1)} to go.`); }
   stats(); drawFollow(); pocketUpdate(); }
 function spoken(c){ if(c.k==='END') return R.loop?'you are back at the start':'you have arrived'; const t=(TXT[c.k]||'Continue').toLowerCase().replace('make a ','');
   return c.onto?`${t} onto ${speakName(c.onto)}`:t; }
@@ -516,9 +542,10 @@ const cap=t=>t.charAt(0).toUpperCase()+t.slice(1);
 const spokenTime=s=>{ s=Math.round(s); const m=Math.floor(s/60), x=s%60; return m?`${m} minute${m>1?'s':''}${x?` ${x} second${x>1?'s':''}`:''}`:`${x} seconds`; };
 function showBanner(k,[d,u],txt,sub,off=false){ const b=$('banner'); b.hidden=false; b.classList.toggle('off',!!off); $('bIc').innerHTML=arrowSvg(k); $('bDist').innerHTML=d?`${d}<small>${u}</small>`:''; $('bTxt').textContent=txt; $('bSub').textContent=sub||'';
   document.documentElement.style.setProperty('--bh',(b.offsetHeight)+'px'); }
-function stats(){ const s=NAV.s??0, el=NAV.t0?(Date.now()-NAV.t0)/1000:0; $('sDone').textContent=(s/MI).toFixed(2); $('sLeft').textContent=((R.total-s)/MI).toFixed(2); $('sTime').textContent=fmtTime(el);
+function stats(){ const s=NAV.s??0, el=(NAV.t0?(Date.now()-NAV.t0)/1000:0)*(NAV.demo?DEMO.mult:1); $('sDone').textContent=(s/MI).toFixed(2); $('sLeft').textContent=((R.total-s)/MI).toFixed(2); $('sTime').textContent=fmtTime(el);
   $('sPace').textContent=s>160?fmtTime(el/(s/MI)):'–'; }
-function drawFollow(){ if(MAP.follow&&NAV.fix){ MAP.lat=NAV.fix.lat; MAP.lon=NAV.fix.lon; if(MAP.headUp&&NAV.head!=null) MAP.rot=-(Math.PI/2-NAV.head); else MAP.rot=0; } draw(); }
+function followNow(){ if(MAP.follow&&DISP.lat!=null){ MAP.lat=DISP.lat; MAP.lon=DISP.lon; if(MAP.headUp&&DISP.head!=null) MAP.rot=-(Math.PI/2-DISP.head); else MAP.rot=0; } }
+function drawFollow(){ if(!ANIM.raf){ stepDisplay(1); followNow(); } draw(); }
 function setFollow(on){ MAP.follow=on; $('fFollow').setAttribute('aria-pressed',String(on)); if(on){ if(MAP.zf<16.5) MAP.zf=17; drawFollow(); } }
 setInterval(()=>{ if(NAV.on&&NAV.t0&&!NAV.done) stats(); },1000);
 
@@ -534,7 +561,7 @@ function updateAway(){ if(!NAV.fix||!R.ll.length) return; const [x,y]=toXY(NAV.f
 
 /* ---------------- start / stop ---------------- */
 function begin(demo=false){
-  NAV.on=true; NAV.demo=demo; if(demo){ NAV.fix=null; NAV.head=null; NAV.lastXY=null; } NAV.s=null; NAV.said.clear(); NAV.mile=0; NAV.done=false; NAV.offOn=false; NAV.off=0; NAV.t0=Date.now();
+  NAV.on=true; NAV.demo=demo; if(demo){ NAV.fix=null; NAV.head=null; NAV.lastXY=null; } NAV.s=null; NAV.v=0; DISP.s=DISP.lat=DISP.lon=DISP.head=null; $('simChip').hidden=!demo; NAV.said.clear(); NAV.mile=0; NAV.done=false; NAV.offOn=false; NAV.off=0; NAV.t0=Date.now();
   $('startSheet').hidden=true; $('bar').hidden=false; $('fabs').hidden=false;
   // a gesture is needed before speech works on iPhones
   if('speechSynthesis' in window){ try{ const u=new SpeechSynthesisUtterance(' '); u.volume=0; speechSynthesis.speak(u); }catch(e){} }
@@ -543,14 +570,23 @@ function begin(demo=false){
   if(demo) runDemo(); else { startGps(); if(NAV.fix) onFix(NAV.fix); else update(); }
   store.set('rnActive',{key:currentKey(),t0:NAV.t0});
 }
-function end(){ NAV.on=false; if(NAV.demo){ NAV.demo=false; clearInterval(DEMO.t); if(NAV.realFix){ NAV.fix=NAV.realFix; NAV.head=null; NAV.lastXY=null; } } NAV.s=null; NAV.next=null; try{ wake&&wake.release(); }catch(e){} wake=null;
+function end(){ NAV.on=false; $('simChip').hidden=true; DISP.s=DISP.lat=DISP.lon=DISP.head=null; if(NAV.demo){ NAV.demo=false; clearInterval(DEMO.t); if(NAV.realFix){ NAV.fix=NAV.realFix; NAV.head=null; NAV.lastXY=null; } } NAV.s=null; NAV.next=null; try{ wake&&wake.release(); }catch(e){} wake=null;
   $('bar').hidden=$('fabs').hidden=$('banner').hidden=$('then').hidden=true; $('pocket').hidden=true; $('startSheet').hidden=false; store.set('rnActive',null); fitRoute(); }
 // simulated run: walks the route at ~9 min/mile pace, sped up, with a little GPS wobble
-const DEMO={t:null,s:0};
-function runDemo(){ DEMO.s=0; clearInterval(DEMO.t); const speed=2.98*12; // metres per tick (12x real pace)
-  DEMO.t=setInterval(()=>{ if(!NAV.on){ clearInterval(DEMO.t); return; } DEMO.s+=speed*0.5; const [x,y]=pointAt(DEMO.s), j=()=>(Math.random()-0.5)*6;
-    onFix({lat:PROJ.lat0+(y+j())/PROJ.ky,lon:PROJ.lon0+(x+j())/PROJ.kx,acc:8,heading:null,speed:3});
-    if(DEMO.s>R.total+30){ clearInterval(DEMO.t); } },500); }
+// Simulated phone GPS: one fix a second (like a phone's GPS chip) at a steady ~9:00/mi pace times the preview speed,
+// with slowly wandering error (a few metres), reported accuracy, course and speed.
+const DEMO={t:null,s:0,mult:store.get('rnSimMult',4),last:0,ex:0,ey:0};
+const gauss=()=>{ let u=0,v=0; while(!u) u=Math.random(); while(!v) v=Math.random(); return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v); };
+function demoTick(){ if(!NAV.on||!NAV.demo){ clearInterval(DEMO.t); return; }
+  const now=performance.now(), pace=2.98*DEMO.mult; DEMO.s+=pace*(now-DEMO.last)/1000; DEMO.last=now;
+  DEMO.ex=DEMO.ex*0.85+gauss()*0.9; DEMO.ey=DEMO.ey*0.85+gauss()*0.9;          // drift, not white noise
+  const [x,y]=pointAt(Math.min(DEMO.s,R.total)), hd=headAlong(Math.min(DEMO.s,R.total-1));
+  const course=((90-hd*180/Math.PI+gauss()*4)%360+360)%360;
+  onFix({lat:PROJ.lat0+(y+DEMO.ex)/PROJ.ky,lon:PROJ.lon0+(x+DEMO.ey)/PROJ.kx,acc:4+Math.abs(gauss())*3,heading:DEMO.s<R.total?course:null,speed:DEMO.s<R.total?pace*(1+gauss()*0.04):0,t:Date.now()});
+  if(DEMO.s>R.total+30) clearInterval(DEMO.t); }
+function runDemo(){ DEMO.s=0; DEMO.ex=DEMO.ey=0; DEMO.last=performance.now(); clearInterval(DEMO.t); simLabel(); demoTick(); DEMO.t=setInterval(demoTick,1000); }
+const simLabel=()=>{ $('simChip').textContent=`Preview · ${DEMO.mult}×`; $('simChip').setAttribute('aria-label',`Preview speed ${DEMO.mult} times running pace. Tap to change.`); };
+$('simChip').onclick=()=>{ const o=[1,4,12]; DEMO.mult=o[(o.indexOf(DEMO.mult)+1)%o.length]||4; store.set('rnSimMult',DEMO.mult); simLabel(); toast(DEMO.mult===1?'Preview at running pace (about 9 min/mi).':`Preview at ${DEMO.mult}× running pace.`); };
 
 /* ---------------- pocket mode ---------------- */
 function pocket(on){ $('pocket').hidden=!on; if(!on){ $('pocketBtn').focus(); animStart(); } if(on){ $('hold').focus(); keepAwake(); pocketUpdate(); toast('Pocket mode: voice cues on, screen locked. Hold the circle to unlock.'); } }
