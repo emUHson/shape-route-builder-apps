@@ -139,7 +139,7 @@ function drawOverlay(){
   } else {
     // ahead: a quiet guide line, a touch brighter inside the gravity well
     path(prog,R.total); c.strokeStyle='rgba(0,161,156,.5)'; c.lineWidth=lw*0.45; c.stroke();
-    path(prog,Math.min(R.total,prog+WELL)); c.save(); c.shadowColor='#00D2BE'; c.shadowBlur=6; c.strokeStyle='rgba(0,210,190,.55)'; c.lineWidth=lw*0.55; c.stroke(); c.restore();
+    if(FX.kind!=='off'&&!calm) aheadGlow(c,prog,lw);
     // behind: calm, thick, glowing; no motion
     if(prog>0){ path(0,prog);
       c.save(); c.shadowColor='#00D2BE'; c.shadowBlur=26; c.strokeStyle='rgba(0,161,156,.9)'; c.lineWidth=lw*1.9+4; c.stroke(); c.restore();
@@ -185,6 +185,16 @@ const angWrap=a=>{ while(a>Math.PI) a-=2*Math.PI; while(a<-Math.PI) a+=2*Math.PI
 /* ---- gravity well: particles ahead of you fall in along the route, slowly at first, then very fast ---- */
 const WELL=230;                                  // metres ahead where the pull starts (~2½ blocks)
 const PART={list:[],energy:0,spawn:0};
+// The line ahead: barely lifted two-plus blocks out, building smoothly to a strong glow at the runner.
+function aheadGlow(c,prog,lw){
+  const z1=Math.min(R.total,prog+WELL), step=5;
+  for(let a=z1;a>prog;a-=step){                         // far → near, so the brighter pieces sit on top
+    const b=Math.max(prog,a-step-0.6), k=1-(((a+b)/2)-prog)/WELL, e=Math.pow(Math.max(0,k),2.2);   // gentle far, steep near
+    const p=screenOf(...llAt(a)), q=screenOf(...llAt(b));
+    c.beginPath(); c.moveTo(p[0],p[1]); c.lineTo(q[0],q[1]);
+    c.save(); c.shadowColor='#00D2BE'; c.shadowBlur=2+18*e;
+    c.strokeStyle=`rgba(${Math.round(0+200*e)},${Math.round(190+65*e)},${Math.round(180+70*e)},${(0.06+0.84*e).toFixed(3)})`;
+    c.lineWidth=lw*(0.5+0.75*e); c.stroke(); c.restore(); } }
 const FX={kind:['well','surge','off'].includes(store.get('rnFx','well'))?store.get('rnFx','well'):'well'};
 /* ---- power surge: the line ahead crackles; sparks get smaller-scale wild the closer you are, arcs jump from you onto it ---- */
 const SURGE={list:[],spawn:0,arcT:0,arcs:[]}, GRIND={list:[],spawn:0};
@@ -193,11 +203,7 @@ function drawSurge(c,prog,lw){
   const you=screenOf(DISP.lat,DISP.lon), heat=d=>{ const k=1-Math.min(1,Math.max(0,d)/Z); return k*k; };   // 0 far out → 1 at you
   const tan=s2=>{ const a=screenOf(...llAt(s2)), b=screenOf(...llAt(s2+2)), l=Math.hypot(b[0]-a[0],b[1]-a[1])||1; return [a,(b[0]-a[0])/l,(b[1]-a[1])/l]; };
   c.save(); c.globalCompositeOperation='lighter'; c.lineCap='round';
-  // 1. the charged line: flickers harder near you
   const z1=Math.min(R.total,prog+Z);
-  for(let a=prog;a<z1;a+=8){ const e=heat(a-prog), fl=dt?Math.random():0.6, p=screenOf(...llAt(a)), q=screenOf(...llAt(Math.min(z1,a+8.5)));
-    c.strokeStyle=`rgba(${Math.round(120+135*e*fl)},255,${Math.round(235+20*e)},${(0.18+0.55*e*(0.4+0.6*fl)).toFixed(3)})`; c.lineWidth=lw*(0.4+0.5*e*fl);
-    c.beginPath(); c.moveTo(p[0],p[1]); c.lineTo(q[0],q[1]); c.stroke(); }
   // 2. sparks: born on the line, thrown off it; near you they're faster, shorter-lived and twitchier
   // motion is in screen pixels so sparks read the same at any zoom
   if(live&&dt){ SURGE.spawn+=dt*240; while(SURGE.spawn>=1&&SURGE.list.length<300){ SURGE.spawn--;
