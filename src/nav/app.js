@@ -153,7 +153,7 @@ function drawOverlay(){
   const nc=NAV.next; if(nc&&nc.k!=='START'){ const q=screenOf(...R.ll[nc.i]); c.beginPath(); c.arc(q[0],q[1],lw*0.9,0,7); c.fillStyle='#fff'; c.fill(); c.lineWidth=2.5; c.strokeStyle='#000'; c.stroke(); }
   // start / finish
   const s0=P[0]; c.beginPath(); c.arc(s0[0],s0[1],9,0,7); c.fillStyle='#fff'; c.fill(); c.fillStyle='#000'; c.font='700 10px system-ui'; c.textAlign='center'; c.textBaseline='middle'; c.fillText('S',s0[0],s0[1]+0.5);
-  if(running&&!calm&&DISP.lat!=null){ if(FX.kind==='well') drawWell(c,prog,lw); else if(FX.kind==='surge') drawSurge(c,prog,lw); }
+  if(running&&!calm&&DISP.lat!=null){ if(FX.kind==='well') drawWell(c,prog,lw); else if(FX.kind==='surge') drawSurge(c,prog,lw); else if(FX.kind==='chev') drawChevrons(c,prog,lw); }
   // you
   if(NAV.fix&&DISP.lat!=null){ const q=screenOf(DISP.lat,DISP.lon), mpp=156543.03*Math.cos(DISP.lat*Math.PI/180)/2**MAP.zf, rr=(DISP.s!=null?0:NAV.fix.acc)/mpp;
     if(rr>12){ c.beginPath(); c.arc(q[0],q[1],rr,0,7); c.fillStyle='rgba(0,210,190,.10)'; c.fill(); c.strokeStyle='rgba(0,210,190,.35)'; c.lineWidth=1; c.stroke(); }
@@ -187,17 +187,30 @@ const WELL=230;                                  // metres ahead where the pull 
 const PART={list:[],energy:0,spawn:0};
 // The line ahead: barely lifted two-plus blocks out, building smoothly to a strong glow at the runner.
 function aheadGlow(c,prog,lw){
-  const z1=Math.min(R.total,prog+WELL), step=5;
+  const lite=FX.kind==='chev', z1=Math.min(R.total,prog+WELL), step=lite?10:5;
   for(let a=z1;a>prog;a-=step){                         // far → near, so the brighter pieces sit on top
     const b=Math.max(prog,a-step-0.6), k=1-(((a+b)/2)-prog)/WELL, e=Math.pow(Math.max(0,k),2.2);   // gentle far, steep near
     const p=screenOf(...llAt(a)), q=screenOf(...llAt(b));
     c.beginPath(); c.moveTo(p[0],p[1]); c.lineTo(q[0],q[1]);
-    c.save(); c.shadowColor='#00D2BE'; c.shadowBlur=2+18*e;
+    c.save(); if(!lite||e>0.55){ c.shadowColor='#00D2BE'; c.shadowBlur=lite?6+8*e:2+18*e; }
     c.strokeStyle=`rgba(${Math.round(0+200*e)},${Math.round(190+65*e)},${Math.round(180+70*e)},${(0.06+0.84*e).toFixed(3)})`;
     c.lineWidth=lw*(0.5+0.75*e); c.stroke(); c.restore(); } }
-const FX={kind:['well','surge','off'].includes(store.get('rnFx','well'))?store.get('rnFx','well'):'well'};
+const FX={kind:['well','surge','chev','off'].includes(store.get('rnFx','well'))?store.get('rnFx','well'):'well'};
 /* ---- power surge: the line ahead crackles; sparks get smaller-scale wild the closer you are, arcs jump from you onto it ---- */
 const SURGE={list:[],spawn:0,arcT:0,arcs:[]}, GRIND={list:[],spawn:0};
+/* ---- chevrons: arrows flowing forward along the route, same gradient; the light, battery-friendly option ---- */
+function drawChevrons(c,prog,lw){
+  const gap=16, flow=(ANIM.t*14)%gap;                     // they drift forward at ~14 m/s, so the line reads as moving ahead
+  c.save(); c.lineCap='round'; c.lineJoin='round';
+  for(let d=gap-flow+4;d<WELL;d+=gap){ const s0=prog+d; if(s0>R.total-3) break;
+    const k=1-d/WELL, e=Math.pow(k,1.8), a=screenOf(...llAt(s0)), b=screenOf(...llAt(s0+3)), an=Math.atan2(b[1]-a[1],b[0]-a[0]);
+    const sz=lw*(0.45+0.7*e), fadeIn=Math.min(1,(d-4)/6);       // the nearest one fades in rather than popping
+    c.save(); c.translate(a[0],a[1]); c.rotate(an);
+    if(e>0.5){ c.shadowColor='#00D2BE'; c.shadowBlur=4+8*e; }
+    c.strokeStyle=`rgba(${Math.round(40+215*e)},${Math.round(215+40*e)},${Math.round(200+55*e)},${((0.18+0.8*e)*fadeIn).toFixed(3)})`;
+    c.lineWidth=Math.max(1.5,lw*(0.22+0.2*e));
+    c.beginPath(); c.moveTo(-sz*0.55,-sz*0.75); c.lineTo(sz*0.45,0); c.lineTo(-sz*0.55,sz*0.75); c.stroke(); c.restore(); }
+  c.restore(); }
 function drawSurge(c,prog,lw){
   const dt=ANIM.frame?Math.min(0.06,ANIM.dt||0.033):0, mpp=156543.03*Math.cos(MAP.lat*Math.PI/180)/2**MAP.zf, live=!NAV.offOn&&!NAV.done, Z=WELL;
   const you=screenOf(DISP.lat,DISP.lon), heat=d=>{ const k=1-Math.min(1,Math.max(0,d)/Z); return k*k; };   // 0 far out → 1 at you
@@ -290,8 +303,8 @@ function drawWell(c,prog,lw){
   c.fillStyle=g; c.beginPath(); c.arc(you[0],you[1],r0*2.6,0,7); c.fill();
   c.restore(); }
 function animLoop(ts){ ANIM.raf=0; if(!NAV.on||document.hidden||!$('pocket').hidden) return;
-  if(ts-ANIM.last>=33){ ANIM.dt=ANIM.last?Math.min(0.25,(ts-ANIM.last)/1000):0.033; ANIM.last=ts; ANIM.t=ts/1000; ANIM.frame=true;
-    stepDisplay(ANIM.dt); followNow(); if(MAP.follow) draw(); else drawOverlay(); ANIM.frame=false; }
+  if(ts-ANIM.last>=(FX.kind==='chev'||FX.kind==='off'?50:33)){ ANIM.dt=ANIM.last?Math.min(0.25,(ts-ANIM.last)/1000):0.033; ANIM.last=ts; ANIM.t=ts/1000; ANIM.frame=true;
+    stepDisplay(ANIM.dt); followNow(); turnCall(); if(MAP.follow) draw(); else drawOverlay(); ANIM.frame=false; }
   ANIM.raf=requestAnimationFrame(animLoop); }
 function animStart(){ if(!ANIM.raf) ANIM.raf=requestAnimationFrame(animLoop); }
 document.addEventListener('visibilitychange',()=>{ if(!document.hidden) animStart(); });
@@ -324,7 +337,7 @@ $('map').addEventListener('keydown',e=>{ const k=e.key, step=80;
   else return; e.preventDefault(); });
 
 /* ---------------- voice ---------------- */
-const VOICE={on:store.get('rnVoice',true),miles:store.get('rnMiles',true),farFt:store.get('rnFarFt',400),thenNext:store.get('rnThenNext',false),haptic:store.get('rnHaptic',true),unlocked:false};
+const VOICE={on:store.get('rnVoice',true),miles:store.get('rnMiles',true),leadFt:clamp(store.get('rnLeadFt',50),0,100),pocketLvl:store.get('rnPocketLvl',1),thenNext:store.get('rnThenNext',false),haptic:store.get('rnHaptic',true),unlocked:false};
 function say(t,urgent=false){ if(!VOICE.on||!('speechSynthesis' in window)) return; try{ if(urgent) speechSynthesis.cancel(); const u=new SpeechSynthesisUtterance(t); u.rate=1.02; u.lang='en-US'; speechSynthesis.speak(u); }catch(e){} }
 function buzz(p){ if(!VOICE.haptic) return; try{ navigator.vibrate&&navigator.vibrate(p); }catch(e){} }
 
@@ -375,16 +388,19 @@ function update(){
   // the cue after next, when it comes quickly
   const after=i>=0?R.cues[i+1]:null;
   if(after&&!NAV.offOn&&!NAV.done&&after.s-nc.s<120){ $('then').hidden=false; $('thIc').innerHTML=arrowSvg(after.k); $('thTxt').textContent=cueShort(after); } else $('then').hidden=true;
-  // voice: early warning and at the turn
-  if(!NAV.offOn&&!NAV.done&&nc.k!=='START'){ const key=R.cues.indexOf(nc), st=NAV.said.get(key)||0;
-    const far=VOICE.farFt*FT, gap=after?after.s-nc.s:0;
-    // "then…": always for turns that come quickly; for every turn when the option is on
-    const then=after&&after.k!=='START'&&(gap<80||VOICE.thenNext)?(gap<80?`, then ${spoken(after)}`:`, then in ${sayDist(gap)}, ${spoken(after)}`):'';
-    if(st<1&&dist<=far&&dist>36){ NAV.said.set(key,1); say(`In ${sayDist(dist)}, ${spoken(nc)}${VOICE.thenNext?then:''}.`); buzz(nc.k==='S'?0:120); }
-    else if(st<2&&dist<=22){ NAV.said.set(key,2); say(cap(spoken(nc))+then+'.'); buzz(nc.k==='S'?90:[260,110,260,110,420]); } }
+  turnCall();
   // mile markers
   const mile=Math.floor(s/MI); if(VOICE.miles&&mile>NAV.mile&&!NAV.done){ NAV.mile=mile; const el=(Date.now()-NAV.t0)/1000*(NAV.demo?DEMO.mult:1); say(`Mile ${mile}. ${spokenTime(el/mile)} per mile. ${((R.total-s)/MI).toFixed(1)} to go.`); }
   stats(); drawFollow(); pocketUpdate(); }
+// One call per turn, VOICE.leadFt before the intersection, timed on the smoothed (dead-reckoned) position so it
+// isn't late between 1-second GPS fixes. With "turn after next" on, the following turn is spoken right after.
+function turnCall(){
+  if(!NAV.on||NAV.offOn||NAV.done||NAV.s==null||!VOICE.on&&!VOICE.haptic) return;
+  const sp=NAV.s+Math.max(0,Math.min(NAV.v*(performance.now()-NAV.fixT)/1000,NAV.v*1.6+3)), lead=VOICE.leadFt*FT;
+  for(let i=1;i<R.cues.length;i++){ const c=R.cues[i]; if(c.k==='END') break; if(c.s<sp-15||NAV.said.get(i)) continue; if(c.s-sp>lead) break;
+    NAV.said.set(i,1); say(cap(spoken(c))+'.',true); buzz(c.k==='S'?90:[260,110,260,110,420]);
+    const after=R.cues[i+1]; if(VOICE.thenNext&&after) say(`Then ${spoken(after)}.`);
+    break; } }
 function spoken(c){ if(c.k==='END') return R.loop?'you are back at the start':'you have arrived'; const t=(TXT[c.k]||'Continue').toLowerCase().replace('make a ','');
   return c.onto?`${t} onto ${speakName(c.onto)}`:t; }
 const speakName=n=>n.replace(/^NE /,'Northeast ').replace(/^NW /,'Northwest ').replace(/^SE /,'Southeast ').replace(/^SW /,'Southwest ').replace(/^N /,'North ').replace(/^S /,'South ').replace(/^E /,'East ').replace(/^W /,'West ')
@@ -398,7 +414,7 @@ function stats(){ const s=NAV.s??0, el=(NAV.t0?(Date.now()-NAV.t0)/1000:0)*(NAV.
 function followNow(){ if(MAP.follow&&DISP.lat!=null){ MAP.lat=DISP.lat; MAP.lon=DISP.lon; if(MAP.headUp&&DISP.head!=null) MAP.rot=-(Math.PI/2-DISP.head); else MAP.rot=0; } }
 function drawFollow(){ if(!ANIM.raf){ stepDisplay(1); followNow(); } draw(); }
 function setFollow(on){ MAP.follow=on; $('fFollow').setAttribute('aria-pressed',String(on)); if(on){ if(MAP.zf<16.5) MAP.zf=17; drawFollow(); } }
-setInterval(()=>{ if(NAV.on&&NAV.t0&&!NAV.done) stats(); },1000);
+setInterval(()=>{ if(NAV.on&&NAV.t0&&!NAV.done){ stats(); pocketUpdate(); } },1000);
 
 /* ---------------- GPS + screen wake ---------------- */
 let wake=null;
@@ -441,9 +457,20 @@ const simLabel=()=>{ $('simChip').textContent=`Preview · ${DEMO.mult}×`; $('si
 $('simChip').onclick=()=>{ const o=SIM_SPEEDS; DEMO.mult=o[(o.indexOf(DEMO.mult)+1)%o.length]||3; store.set('rnSimMult',DEMO.mult); simLabel(); toast(DEMO.mult===1?'Preview at running pace (about 9 min/mi).':`Preview at ${DEMO.mult}× running pace.`); };
 
 /* ---------------- pocket mode ---------------- */
-function pocket(on){ $('pocket').hidden=!on; if(!on){ $('pocketBtn').focus(); animStart(); } if(on){ $('hold').focus(); keepAwake(); pocketUpdate(); toast('Pocket mode: voice cues on, screen locked. Hold the circle to unlock.'); } }
+const PK=[0.65,1,1.9,3.2];
+function setPocketLvl(v){ VOICE.pocketLvl=clamp(+v,0,3); store.set('rnPocketLvl',VOICE.pocketLvl); $('pocket').style.setProperty('--pk',PK[VOICE.pocketLvl]); $('mPocketLvl').value=$('piLvl').value=String(VOICE.pocketLvl); }
+function askPocket(){ if(store.get('rnPocketIntroSeen',false)&&!store.get('rnPocketAlways',false)){ pocket(true); return; }
+  $('piAgain').checked=store.get('rnPocketAlways',false); $('pocketIntro').hidden=$('scrim').hidden=false; $('piGo').focus(); }
+const closePocketIntro=()=>{ $('pocketIntro').hidden=true; if($('menuSheet').hidden&&$('cueSheet').hidden) $('scrim').hidden=true; };
+$('piGo').onclick=()=>{ store.set('rnPocketIntroSeen',true); store.set('rnPocketAlways',$('piAgain').checked); closePocketIntro(); pocket(true); };
+$('piCancel').onclick=()=>{ closePocketIntro(); $('pocketBtn').focus(); };
+$('piLvl').onchange=e=>setPocketLvl(e.target.value); $('mPocketLvl').onchange=e=>setPocketLvl(e.target.value);
+function pocket(on){ $('pocket').hidden=!on; if(!on){ $('pocketBtn').focus(); animStart(); } if(on){ goFull(); $('hold').focus(); keepAwake(); pocketUpdate(); } }
 function pocketUpdate(){ if($('pocket').hidden) return; const nc=NAV.next; if(!nc) return; $('pIc').innerHTML=arrowSvg(NAV.offOn?'OFF':nc.k); const [d,u]=NAV.offOn?['Off','route']:fmtDist(Math.max(0,nc.s-(NAV.s??0)));
-  $('pDist').textContent=`${d} ${u}`; $('pTxt').textContent=NAV.offOn?'Head back to the route':cueText(nc); $('pStat').textContent=`${$('sDone').textContent} / ${(R.total/MI).toFixed(2)} mi · ${$('sTime').textContent}`; }
+  $('pDist').textContent=`${d} ${u}`; $('pTxt').textContent=NAV.offOn?'Head back to the route':cueText(nc); $('pStat').textContent=`${$('sDone').textContent} / ${(R.total/MI).toFixed(2)} mi · ${$('sTime').textContent}`;
+  const now=nowPace(); $('pPace').textContent=`Pace now ${now||'–'} · avg ${$('sPace').textContent} /mi`; }
+// current pace: smoothed GPS speed (in a preview, scaled back to running pace)
+function nowPace(){ const v=NAV.v/(NAV.demo?DEMO.mult:1); return v>0.6?fmtTime(MI/v):''; }
 (()=>{ const h=$('hold'); let t=null; const stop=()=>{ h.classList.remove('on'); clearTimeout(t); };
   h.addEventListener('pointerdown',e=>{ e.preventDefault(); h.classList.add('on'); t=setTimeout(()=>{ stop(); pocket(false); },1200); });
   h.addEventListener('pointerup',stop); h.addEventListener('pointerleave',stop); h.addEventListener('pointercancel',stop);
@@ -511,11 +538,25 @@ function openCues(from){
 function closeCues(){ if($('cueSheet').hidden) return; $('cueSheet').hidden=true; if($('menuSheet').hidden) $('scrim').hidden=true; if(cueOpener&&cueOpener.focus) cueOpener.focus(); }
 $('cuesBtn').onclick=e=>openCues(e.currentTarget); $('cuesBtn2').onclick=e=>openCues(e.currentTarget); $('cueClose').onclick=closeCues;
 
+/* ---------------- full screen ---------------- */
+// Browsers only allow it from a tap, so it goes full screen on Start (and on the first tap anywhere while running).
+// iPhones don't offer full screen to web pages; adding Run Nav to the home screen gives the same thing there.
+const fsEl=document.documentElement, fsOK=!!(fsEl.requestFullscreen||fsEl.webkitRequestFullscreen)&&document.fullscreenEnabled!==false;
+const isFull=()=>!!(document.fullscreenElement||document.webkitFullscreenElement);
+function goFull(){ if(!fsOK||isFull()) return; try{ const p=(fsEl.requestFullscreen||fsEl.webkitRequestFullscreen).call(fsEl,{navigationUI:'hide'}); p&&p.catch&&p.catch(()=>{}); }catch(e){} }
+function exitFull(){ try{ (document.exitFullscreen||document.webkitExitFullscreen).call(document); }catch(e){} }
+const fsUI=()=>{ $('fFull').setAttribute('aria-pressed',String(isFull())); $('fFull').setAttribute('aria-label',isFull()?'Leave full screen':'Full screen'); };
+$('fFull').hidden=!fsOK; $('fFull').onclick=()=>{ isFull()?exitFull():goFull(); };
+let fsAuto=true;   // once you leave full screen yourself, taps stop putting it back
+const fsChange=()=>{ fsUI(); if(!isFull()) fsAuto=false; };
+document.addEventListener('fullscreenchange',fsChange); document.addEventListener('webkitfullscreenchange',fsChange);
+document.addEventListener('pointerdown',()=>{ if(NAV.on&&fsAuto) goFull(); },{capture:true});
+
 /* ---------------- wiring ---------------- */
-$('goBtn').onclick=()=>begin(false);
-$('demoBtn').onclick=()=>begin(true);
+$('goBtn').onclick=()=>{ fsAuto=true; goFull(); begin(false); };
+$('demoBtn').onclick=()=>{ fsAuto=true; goFull(); begin(true); };
 $('otherBtn').onclick=openElsewhere; $('mOther').onclick=()=>{ closeMenu(); openElsewhere(); };
-$('pocketBtn').onclick=()=>pocket(true);
+$('pocketBtn').onclick=askPocket;
 $('fFollow').onclick=()=>setFollow(!MAP.follow);
 $('fAll').onclick=()=>{ setFollow(false); fitRoute(); };
 const setHead=on=>{ MAP.headUp=on; $('fHead').setAttribute('aria-pressed',String(on)); $('mHead').checked=on; store.set('rnHead',on); if(!on) MAP.rot=0; drawFollow(); };
@@ -523,20 +564,20 @@ $('fHead').onclick=()=>setHead(!MAP.headUp); $('mHead').onchange=e=>setHead(e.ta
 const setVoice=on=>{ VOICE.on=on; store.set('rnVoice',on); $('fVoice').setAttribute('aria-pressed',String(on)); $('mVoice').checked=on; if(!on) try{ speechSynthesis.cancel(); }catch(e){} };
 $('fVoice').onclick=()=>{ setVoice(!VOICE.on); toast(VOICE.on?'Voice cues on.':'Voice cues off.'); }; $('mVoice').onchange=e=>setVoice(e.target.checked);
 $('mMiles').onchange=e=>{ VOICE.miles=e.target.checked; store.set('rnMiles',VOICE.miles); }; $('mMiles').checked=VOICE.miles;
-const farLabel=()=>{ $('mFarV').textContent=`${VOICE.farFt.toLocaleString('en-US')} ft`; };
-$('mFar').value=VOICE.farFt; farLabel();
-$('mFar').addEventListener('input',e=>{ VOICE.farFt=+e.target.value; store.set('rnFarFt',VOICE.farFt); farLabel(); });
-$('mFx').value=FX.kind; $('mFx').onchange=e=>{ FX.kind=e.target.value; store.set('rnFx',FX.kind); PART.list=[]; SURGE.list=[]; SURGE.arcs=[]; drawOverlay(); };
+const leadLabel=()=>{ $('mLeadV').textContent=VOICE.leadFt?`${VOICE.leadFt} ft before`:'At the turn'; };
+$('mLead').value=VOICE.leadFt; leadLabel();
+$('mLead').addEventListener('input',e=>{ VOICE.leadFt=+e.target.value; store.set('rnLeadFt',VOICE.leadFt); leadLabel(); });
+$('mFx').value=FX.kind; $('mFx').onchange=e=>{ FX.kind=e.target.value; store.set('rnFx',FX.kind); PART.list=[]; SURGE.list=[]; SURGE.arcs=[]; GRIND.list=[]; drawOverlay(); };
 $('mThen').checked=VOICE.thenNext; $('mThen').onchange=e=>{ VOICE.thenNext=e.target.checked; store.set('rnThenNext',VOICE.thenNext); };
 $('mHaptic').checked=VOICE.haptic; $('mHaptic').onchange=e=>{ VOICE.haptic=e.target.checked; store.set('rnHaptic',VOICE.haptic); if(VOICE.haptic) buzz([260,110,260]); };
 if(!('vibrate' in navigator)){ $('mHaptic').disabled=true; $('mHapticNote').textContent='This phone doesn\'t let web pages vibrate (iPhones don\'t).'; }
 const closeMenu=()=>{ $('menuSheet').hidden=$('scrim').hidden=true; $('menuBtn').focus(); };
-$('menuBtn').onclick=()=>{ $('menuSheet').hidden=$('scrim').hidden=false; $('mVoice').focus(); }; $('mClose').onclick=closeMenu; $('scrim').onclick=()=>{ closeMenu(); closeCues(); };
+$('menuBtn').onclick=()=>{ $('menuSheet').hidden=$('scrim').hidden=false; $('mVoice').focus(); }; $('mClose').onclick=closeMenu; $('scrim').onclick=()=>{ closeMenu(); closeCues(); closePocketIntro(); };
 $('mEnd').onclick=()=>{ if(NAV.s>50&&!NAV.done&&!confirm('End this run? Your progress will be cleared.')) return; closeMenu(); end(); };
 $('mRestart').onclick=()=>{ if(NAV.s>50&&!NAV.done&&!confirm('Restart from the beginning? Your progress will be cleared.')) return; closeMenu(); const d=NAV.demo; end(); begin(d); };
 $('mShare').onclick=()=>{ closeMenu(); openShare(); };
-setVoice(VOICE.on); setHead(store.get('rnHead',false));
-document.addEventListener('keydown',e=>{ if(e.key!=='Escape') return; if(!$('cueSheet').hidden) closeCues(); else if(!$('menuSheet').hidden) closeMenu(); });
+setVoice(VOICE.on); setHead(store.get('rnHead',false)); setPocketLvl(VOICE.pocketLvl);
+document.addEventListener('keydown',e=>{ if(e.key!=='Escape') return; if(!$('pocketIntro').hidden){ closePocketIntro(); return; } if(!$('cueSheet').hidden) closeCues(); else if(!$('menuSheet').hidden) closeMenu(); });
 
 (async()=>{ resize();
   try{ const r=await routeFromHash(location.hash); if(r){ load(r); return; } }catch(e){ toast('That route link looks damaged. Ask for a fresh link or open the GPX file.',6000); }

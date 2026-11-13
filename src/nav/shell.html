@@ -57,6 +57,8 @@ button,a,label,input{touch-action:manipulation}
 .st.lead .v{color:var(--teal2)}
 .round{width:48px;height:48px;border:1px solid var(--gun);background:transparent;display:grid;place-items:center;border-radius:2px}
 .round svg{width:22px;height:22px}
+#bar .round{height:54px;width:54px;grid-template-rows:22px auto;gap:3px;align-content:center}
+#bar .round span{white-space:nowrap;font:600 8.5px/1 var(--body);letter-spacing:.04em;text-transform:uppercase;color:var(--silver)}
 #fabs{position:fixed;right:10px;bottom:calc(var(--sab) + 84px);z-index:5;display:grid;gap:8px}
 #fabs button{width:46px;height:46px;background:rgba(0,0,0,.88);border:1px solid var(--graphite);display:grid;place-items:center;border-radius:2px}
 #fabs button[aria-pressed="true"]{border-color:var(--teal);color:var(--teal2)}
@@ -89,7 +91,7 @@ button,a,label,input{touch-action:manipulation}
 .toggle input:checked::after{transform:translateX(20px);background:#000}
 .toggle input:disabled{opacity:.35}
 .hint:empty{display:none}
-.toggle select{background:#17191c;color:var(--ink);border:1px solid var(--gun);border-radius:2px;padding:8px 10px;font:600 13px var(--body);flex:none}
+.toggle select,#piLvl{background:#17191c;color:var(--ink);border:1px solid var(--gun);border-radius:2px;padding:8px 10px;font:600 13px var(--body);flex:none}
 .slider input[type=range]{width:100%;accent-color:var(--teal)}
 .val{font:600 14px var(--mono);color:var(--teal2);font-variant-numeric:tabular-nums}
 #preview{width:100%;height:150px;background:#0b0c0e;border:1px solid var(--graphite)}
@@ -97,6 +99,8 @@ button,a,label,input{touch-action:manipulation}
 
 /* pocket mode: near-black, voice does the work, hold to unlock */
 #pocket{position:fixed;inset:0;z-index:30;background:#000;display:grid;align-content:center;justify-items:center;gap:18px;padding:30px;text-align:center;touch-action:none;user-select:none;-webkit-user-select:none}
+#pocket{--pk:1}
+#pocket .pic,#pocket .pd,#pocket .pt,#pocket .ps,#hold{filter:brightness(var(--pk))}
 #pocket .pic{width:110px;height:110px;color:#1e5f5c}
 #pocket .pd{font:700 56px/1 var(--mono);color:#4a4d52}
 #pocket .pt{font:600 20px/1.3 var(--body);color:#4a4d52;max-width:22ch}
@@ -138,6 +142,7 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
   <button id="fFollow" aria-pressed="true" aria-label="Follow my position" title="Follow me"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3.5"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg></button>
   <button id="fHead" aria-pressed="false" aria-label="Heading up" title="Heading up / north up"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l5 16-5-4-5 4z"/></svg></button>
   <button id="fAll" aria-label="Show whole route" title="Whole route"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+  <button id="fFull" aria-pressed="false" aria-label="Full screen"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></svg></button>
   <button id="fVoice" aria-pressed="true" aria-label="Voice cues" title="Voice"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16 9a4 4 0 010 6M18.5 6.5a8 8 0 010 11"/></svg></button>
 </div>
 <div id="gpsWarn" hidden role="status" aria-live="polite"></div>
@@ -149,9 +154,9 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
   <div class="st"><div class="k">Time</div><div class="v" id="sTime">0:00</div></div>
   <div class="st"><div class="k">Pace</div><div class="v" id="sPace">–</div></div>
   <div style="display:flex;gap:6px">
-    <button class="round" id="cuesBtn" aria-label="All turns" title="All turns"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6h.01M4 12h.01M4 18h.01" stroke-width="3" stroke-linecap="round"/></svg></button>
-    <button class="round" id="pocketBtn" aria-label="Pocket mode" title="Pocket mode"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="2.5" width="12" height="19" rx="1.5"/><path d="M10 18.5h4"/></svg></button>
-    <button class="round" id="menuBtn" aria-label="Menu" title="Menu"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    <button class="round" id="cuesBtn" aria-label="All turns"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6h.01M4 12h.01M4 18h.01" stroke-width="3" stroke-linecap="round"/></svg><span>Turns</span></button>
+    <button class="round" id="pocketBtn" aria-label="Pocket mode: dark, locked screen with voice cues"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2.5" width="12" height="19" rx="1.5"/><path d="M14.5 8.2a3.6 3.6 0 1 0 3.3 5.3 4.4 4.4 0 0 1-3.3-5.3z" fill="currentColor" stroke="none"/></svg><span>Go dark</span></button>
+    <button class="round" id="menuBtn" aria-label="Menu"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"/></svg><span>Menu</span></button>
   </div>
 </div>
 
@@ -181,14 +186,16 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
   <div class="eyebrow">Run</div>
   <label class="toggle">Voice cues<input type="checkbox" id="mVoice" checked></label>
   <label class="toggle">Mile updates<input type="checkbox" id="mMiles" checked></label>
-  <label class="toggle">Also say the turn after next<input type="checkbox" id="mThen"></label>
-  <div class="slider"><div class="toggle" style="margin-bottom:6px"><label for="mFar">First voice prompt</label><span class="val" id="mFarV"></span></div>
-    <input type="range" id="mFar" min="100" max="1000" step="50" aria-describedby="mFarHint">
-    <p class="hint" id="mFarHint">How far before each turn you hear "In … feet, turn …". A second prompt always comes at the turn.</p></div>
+  <div class="slider"><div class="toggle" style="margin-bottom:6px"><label for="mLead">Turn call</label><span class="val" id="mLeadV"></span></div>
+    <input type="range" id="mLead" min="0" max="100" step="10" aria-describedby="mLeadHint">
+    <p class="hint" id="mLeadHint">How far before each intersection you hear which way to turn, and onto what street.</p></div>
+  <label class="toggle">Also say the turn after next<input type="checkbox" id="mThen" aria-describedby="mThenHint"></label>
+  <p class="hint" id="mThenHint">Right after each turn call you hear the next one too: "Then turn left onto Pine Street."</p>
   <label class="toggle">Vibrate at turns<input type="checkbox" id="mHaptic" checked></label>
+  <div class="toggle"><label for="mPocketLvl">Pocket mode brightness</label><select id="mPocketLvl"><option value="0">Dimmest</option><option value="1">Dim</option><option value="2">Medium</option><option value="3">Bright</option></select></div>
   <p class="hint" id="mHapticNote"></p>
   <label class="toggle">Heading up (map turns with you)<input type="checkbox" id="mHead"></label>
-  <label class="toggle" for="mFx">Route effect<select id="mFx"><option value="well">Gravity well</option><option value="surge">Power surge</option><option value="off">Off (saves battery)</option></select></label>
+  <label class="toggle" for="mFx">Route effect<select id="mFx"><option value="well">Gravity well</option><option value="surge">Power surge</option><option value="chev">Chevrons (light)</option><option value="off">Off (saves battery)</option></select></label>
   <div class="row2"><button class="btn" id="mShare">Share route</button><button class="btn" id="mOther">Open in another app (GPX)</button></div>
   <div class="row2"><button class="btn" id="mRestart">Restart run</button><button class="btn" id="mEnd">End run</button></div>
   <button class="btn" id="mClose">Close</button>
@@ -199,11 +206,21 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
   <p class="hint" id="cueInfo"></p>
   <ol class="cues" id="cueList"></ol>
 </div>
+<div class="sheet" id="pocketIntro" hidden role="dialog" aria-modal="true" aria-labelledby="piTitle">
+  <div class="eyebrow">Pocket mode</div>
+  <h1 id="piTitle">Go dark for the pocket</h1>
+  <p class="hint">The screen turns almost black and stops responding to touches, so it can ride in a pocket or armband without bumps. GPS, voice cues and turn vibrations keep working. To come back, <b>press and hold the circle</b> for a second.</p>
+  <div class="toggle"><label for="piLvl">Screen brightness</label><select id="piLvl"><option value="0">Dimmest</option><option value="1">Dim</option><option value="2">Medium</option><option value="3">Bright</option></select></div>
+  <label class="toggle">Show this every time<input type="checkbox" id="piAgain"></label>
+  <button class="btn primary" id="piGo">Go dark</button>
+  <button class="btn" id="piCancel">Not now</button>
+</div>
 <div id="pocket" hidden>
   <div class="pic" id="pIc"></div>
   <div class="pd" id="pDist"></div>
   <div class="pt" id="pTxt"></div>
   <div class="ps" id="pStat"></div>
+  <div class="ps" id="pPace"></div>
   <button id="hold" type="button" aria-label="Hold to unlock"><svg viewBox="0 0 124 124" aria-hidden="true"><circle cx="62" cy="62" r="60"/></svg>Hold to unlock</button>
 </div>
 
