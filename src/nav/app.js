@@ -346,7 +346,7 @@ function say(t,urgent=false){ if(!VOICE.on||!('speechSynthesis' in window)) retu
 function buzz(p){ if(!VOICE.haptic) return; try{ navigator.vibrate&&navigator.vibrate(p); }catch(e){} }
 
 /* ---------------- navigation ---------------- */
-const NAV={v:0,fixT:0,on:false,demo:false,s:null,fix:null,head:null,next:null,off:0,offOn:false,t0:0,watch:null,said:new Map(),mile:0,lastXY:null,done:false,offAnnounced:0};
+const NAV={nextSaid:new Set(),v:0,fixT:0,on:false,demo:false,s:null,fix:null,head:null,next:null,off:0,offOn:false,t0:0,watch:null,said:new Map(),mile:0,lastXY:null,done:false,offAnnounced:0};
 // where on the route am I? Look near my last progress first (routes can cross or retrace themselves), else anywhere.
 function project(x,y,from,to){ let best=null; for(let i=0;i<R.xy.length-1;i++){ if(R.cum[i+1]<from||R.cum[i]>to) continue;
     const [ax,ay]=R.xy[i],[bx,by]=R.xy[i+1], L2=(bx-ax)**2+(by-ay)**2||1e-9, t=clamp(((x-ax)*(bx-ax)+(y-ay)*(by-ay))/L2,0,1), px=ax+(bx-ax)*t, py=ay+(by-ay)*t, d=Math.hypot(x-px,y-py);
@@ -402,18 +402,19 @@ function turnCall(){
   if(!NAV.on||NAV.offOn||NAV.done||NAV.s==null||!VOICE.on&&!VOICE.haptic) return;
   const sp=NAV.s+Math.max(0,Math.min(NAV.v*(performance.now()-NAV.fixT)/1000,NAV.v*1.6+3)), lead=VOICE.leadFt*FT;
   for(let i=1;i<R.cues.length;i++){ const c=R.cues[i]; if(c.k==='END') break; if(c.s<sp-15||NAV.said.get(i)) continue; if(c.s-sp>lead) break;
-    NAV.said.set(i,1); const u0=say(cap(spoken(c))+'.',true); buzz(c.k==='S'?90:[260,110,260,110,420]);
-    const after=R.cues[i+1]; if(VOICE.thenNext&&after) sayAfterPause(u0,nextTurnLine(c,after));
-    break; } }
+    NAV.said.set(i,1); say(cap(spoken(c))+'.',true); buzz(c.k==='S'?90:[260,110,260,110,420]);
+    break; }
+  // "Next turn…": once you're ~40 ft past a turn (or the start) and onto the new street, which is when you
+  // start wondering what's next. Skipped if the next turn is so close that its own call is about to play.
+  if(VOICE.thenNext) for(let i=0;i<R.cues.length-1;i++){ const c=R.cues[i], after=R.cues[i+1];
+    if(NAV.nextSaid.has(i)||sp<c.s+12) continue; if(sp>c.s+150){ NAV.nextSaid.add(i); continue; }
+    NAV.nextSaid.add(i); if(after.s-sp>lead+15) say(nextTurnLine(c,after)); break; } }
 // "Next turn, right, in 2 blocks." Blocks come from the builder (named cross streets on the stretch);
 // on paths, unnamed stretches or when there's no count it gives the distance instead.
 const DIRWORD={TR:'right',TL:'left',BR:'bear right',BL:'bear left',XR:'sharp right',XL:'sharp left',U:'U-turn',S:'straight on'};
 function nextTurnLine(c,after){ const gap=after.s-c.s, when=c.b>0?`in ${c.b} block${c.b>1?'s':''}`:`in ${sayDist(gap)}`;
   if(after.k==='END') return `Then the finish, ${when}.`;
   return `Next turn, ${DIRWORD[after.k]||'continue'}${after.k==='S'&&after.onto?' onto '+speakName(after.onto):''}, ${when}.`; }
-// speak `t` a short beat after utterance `u` finishes (with a timer fallback for browsers that don't report the end)
-function sayAfterPause(u,t){ if(!VOICE.on) return; let done=false; const go=()=>{ if(done||!NAV.on) return; done=true; say(t); };
-  if(u) u.onend=()=>setTimeout(go,900); setTimeout(go,4500); }
 function spoken(c){ if(c.k==='END') return R.loop?'you are back at the start':'you have arrived'; const t=(TXT[c.k]||'Continue').toLowerCase().replace('make a ','');
   return c.onto?`${t} onto ${speakName(c.onto)}`:t; }
 const speakName=n=>n.replace(/^NE /,'Northeast ').replace(/^NW /,'Northwest ').replace(/^SE /,'Southeast ').replace(/^SW /,'Southwest ').replace(/^N /,'North ').replace(/^S /,'South ').replace(/^E /,'East ').replace(/^W /,'West ')
@@ -441,7 +442,7 @@ function updateAway(){ if(!NAV.fix||!R.ll.length) return; const [x,y]=toXY(NAV.f
 
 /* ---------------- start / stop ---------------- */
 function begin(demo=false){
-  NAV.on=true; NAV.demo=demo; if(demo){ NAV.fix=null; NAV.head=null; NAV.lastXY=null; } NAV.s=null; NAV.v=0; DISP.s=DISP.lat=DISP.lon=DISP.head=null; $('simChip').hidden=!demo; NAV.said.clear(); NAV.mile=0; NAV.done=false; NAV.offOn=false; NAV.off=0; NAV.t0=Date.now();
+  NAV.on=true; NAV.demo=demo; if(demo){ NAV.fix=null; NAV.head=null; NAV.lastXY=null; } NAV.s=null; NAV.v=0; DISP.s=DISP.lat=DISP.lon=DISP.head=null; $('simChip').hidden=!demo; NAV.said.clear(); NAV.nextSaid.clear(); NAV.mile=0; NAV.done=false; NAV.offOn=false; NAV.off=0; NAV.t0=Date.now();
   $('startSheet').hidden=true; $('bar').hidden=false; $('mapCtl').hidden=false;
   // a gesture is needed before speech works on iPhones
   if('speechSynthesis' in window){ try{ const u=new SpeechSynthesisUtterance(' '); u.volume=0; speechSynthesis.speak(u); }catch(e){} }
